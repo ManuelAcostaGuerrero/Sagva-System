@@ -26,9 +26,16 @@ Crear una plataforma modular para gestionar ventas, artículos, inventario, prov
 
 La documentación modular está en la carpeta [`docs`](docs/).
 
-Archivo principal:
+Archivos principales:
 
 - [`docs/00-blueprint-maestro.md`](docs/00-blueprint-maestro.md)
+- [`docs/01-fase-aplicacion-armable.md`](docs/01-fase-aplicacion-armable.md)
+
+## Fases del proyecto
+
+### Fase 01 - Aplicación Armable
+
+Convierte los blueprints de Sagva System en una estructura técnica inicial con rutas, carpetas, servicios, modelos, pantallas base, contratos de integración y base de datos mínima para comenzar el desarrollo modular.
 
 ## Principio modular
 
