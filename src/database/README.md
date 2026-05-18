@@ -1,6 +1,6 @@
 # Database
 
-El esquema ejecutable vive en `prisma/schema.prisma`, usando PostgreSQL y Prisma.
+El esquema ejecutable vive en `prisma/schema.prisma`, usando Prisma y SQLite local para desarrollo.
 
 Comandos principales:
 

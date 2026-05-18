@@ -67,8 +67,12 @@ export const SeguridadService = {
         accion: datos.accion,
         entidad: datos.entidad,
         entidadId: datos.entidadId,
-        datoAnterior: datos.datoAnterior ?? undefined,
-        datoNuevo: datos.datoNuevo ?? undefined,
+        datoAnterior:
+          datos.datoAnterior === undefined
+            ? undefined
+            : JSON.stringify(datos.datoAnterior),
+        datoNuevo:
+          datos.datoNuevo === undefined ? undefined : JSON.stringify(datos.datoNuevo),
         motivo: datos.motivo
       }
     });

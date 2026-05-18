@@ -44,7 +44,7 @@ Esta versión ya incluye una base armable con:
 - Next.js + React + TypeScript.
 - TailwindCSS.
 - Prisma.
-- PostgreSQL.
+- SQLite local para desarrollo inmediato.
 - Rutas base por módulo.
 - Layout principal y menú lateral.
 - Pantalla de login base.
@@ -64,7 +64,7 @@ npm install
 2. Crear archivo `.env` usando `.env.example` como base:
 
 ```bash
-DATABASE_URL="postgresql://sagva:sagva_password@localhost:5432/sagva_system?schema=public"
+DATABASE_URL="file:./dev.db"
 NEXTAUTH_SECRET="change-this-secret"
 APP_URL="http://localhost:3000"
 ```
@@ -105,6 +105,14 @@ Usuario inicial:
 admin@sagva.local
 admin123
 ```
+
+## Módulos funcionales actuales
+
+- Login real con cookie de sesión local.
+- Artículos: listado, nuevo artículo, edición, precios y stock inicial.
+- Inventario: stock actual, entradas, salidas, ajustes y alertas.
+- Proveedores: listado y nuevo proveedor.
+- Facturas: interfaz de carga de proveedor con entorno visual estilo SAGVA.
 
 ## Principio modular
 

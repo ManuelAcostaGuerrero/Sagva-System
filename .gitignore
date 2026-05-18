@@ -16,6 +16,8 @@ dist
 # prisma/local db dumps
 *.db
 *.sqlite
+prisma/dev.db
+prisma/dev.db-journal
 
 # system
 .DS_Store

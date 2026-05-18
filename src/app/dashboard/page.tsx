@@ -1,38 +1,51 @@
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { prisma } from "@/lib/prisma";
 
-export default function DashboardPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const [articulos, proveedores, ventas, stocks] = await Promise.all([
+    prisma.articulo.count(),
+    prisma.proveedor.count(),
+    prisma.venta.count(),
+    prisma.inventarioStock.findMany({
+      include: { articulo: true }
+    })
+  ]);
+
+  const stockCritico = stocks.filter(
+    (stock) =>
+      Number(stock.stockMinimo ?? stock.articulo.stockMinimo ?? 0) > 0 &&
+      Number(stock.stockActual) <= Number(stock.stockMinimo ?? stock.articulo.stockMinimo ?? 0)
+  ).length;
+
   return (
-    <AppShell>
+    <AppShell title="Inicio" subtitle="Resumen operativo de Sagva System">
       <section className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-semibold text-ink">Dashboard</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Primer tablero para conectar ventas, inventario, caja, proveedores y calendario cuando existan datos reales.
-          </p>
-        </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Módulos" value="11" helper="Rutas base creadas" />
-          <StatCard label="Servicios" value="10" helper="Capa inicial de dominio" />
-          <StatCard label="Base de datos" value="29" helper="Modelos Prisma iniciales" />
-          <StatCard label="Estado" value="MVP" helper="Aplicación armable" />
+          <StatCard label="Artículos" value={String(articulos)} helper="Productos registrados" />
+          <StatCard label="Proveedores" value={String(proveedores)} helper="Contactos comerciales" />
+          <StatCard label="Ventas" value={String(ventas)} helper="Operaciones registradas" />
+          <StatCard label="Stock crítico" value={String(stockCritico)} helper="Productos bajo mínimo" />
         </div>
-        <div className="rounded-md border border-line bg-white p-5 shadow-subtle">
-          <h3 className="text-base font-semibold text-ink">Orden sugerido</h3>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+
+        <div className="sagva-panel p-5">
+          <h2 className="text-lg font-bold text-slate-950">Accesos rápidos</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
             {[
-              ["1", "Seguridad base", "/seguridad/usuarios"],
-              ["2", "Artículos", "/articulos"],
-              ["3", "Inventario", "/inventario"]
-            ].map(([step, label, href]) => (
+              ["Nuevo artículo", "/articulos/nuevo"],
+              ["Entrada / salida", "/inventario/movimientos"],
+              ["Nuevo proveedor", "/proveedores/nuevo"],
+              ["Nueva compra", "/facturas/nueva"]
+            ].map(([label, href]) => (
               <Link
-                key={step}
+                key={href}
                 href={href}
-                className="rounded-md border border-line px-4 py-3 hover:bg-panel"
+                className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-[#064ea4] hover:bg-blue-50"
               >
-                <p className="text-xs font-semibold text-brand-700">Paso {step}</p>
-                <p className="mt-1 text-sm font-medium text-ink">{label}</p>
+                {label}
               </Link>
             ))}
           </div>

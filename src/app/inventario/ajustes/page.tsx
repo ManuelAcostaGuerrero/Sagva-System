@@ -1,10 +1,15 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { InventarioMovimientoForm } from "@/components/forms/inventario-movimiento-form";
+import { prisma } from "@/lib/prisma";
 
-export default function InventarioAjustesPage() {
+export const dynamic = "force-dynamic";
+
+export default async function InventarioAjustesPage() {
+  const articulos = await prisma.articulo.findMany({ orderBy: { nombre: "asc" } });
+
   return (
-    <AppShell>
-      <h2 className="text-2xl font-semibold text-ink">Ajustes de inventario</h2>
-      <p className="mt-2 text-sm text-slate-600">Pantalla preparada para ajustes con autorización y trazabilidad.</p>
+    <AppShell title="Ajustes de Inventario" subtitle="Definir stock físico final con trazabilidad">
+      <InventarioMovimientoForm articulos={articulos} tipoDefault="ajuste" />
     </AppShell>
   );
 }

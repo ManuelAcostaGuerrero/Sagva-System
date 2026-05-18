@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -61,8 +61,8 @@ model Auditoria {
   accion      String
   entidad     String?
   entidadId   String?  @map("entidad_id")
-  datoAnterior Json?   @map("dato_anterior")
-  datoNuevo    Json?   @map("dato_nuevo")
+  datoAnterior String? @map("dato_anterior")
+  datoNuevo    String? @map("dato_nuevo")
   motivo      String?
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -134,9 +134,9 @@ model Articulo {
   unidadMedida        String                         @map("unidad_medida")
   cantidadEspecifica  String?                        @map("cantidad_especifica")
   tipoImpuesto        String                         @default("IVA") @map("tipo_impuesto")
-  impuestoAdicional   Decimal?                       @db.Decimal(10, 2) @map("impuesto_adicional")
-  stockMinimo         Decimal?                       @db.Decimal(12, 3) @map("stock_minimo")
-  stockMaximo         Decimal?                       @db.Decimal(12, 3) @map("stock_maximo")
+  impuestoAdicional   Decimal? @map("impuesto_adicional")
+  stockMinimo         Decimal? @map("stock_minimo")
+  stockMaximo         Decimal? @map("stock_maximo")
   comentario          String?
   estado              String                         @default("activo")
   precios             ArticuloPrecio[]
@@ -157,12 +157,12 @@ model ArticuloPrecio {
   id                        String   @id @default(cuid())
   articuloId                String   @map("articulo_id")
   articulo                  Articulo @relation(fields: [articuloId], references: [id], onDelete: Cascade)
-  precioConIva              Decimal  @db.Decimal(12, 2) @map("precio_con_iva")
-  precioSinIva              Decimal  @db.Decimal(12, 2) @map("precio_sin_iva")
-  margen                    Decimal  @db.Decimal(6, 4) @default(0.3)
-  precioPublico             Decimal  @db.Decimal(12, 2) @map("precio_publico")
-  precioMayorista           Decimal? @db.Decimal(12, 2) @map("precio_mayorista")
-  cantidadMinimaMayorista   Decimal? @db.Decimal(12, 3) @map("cantidad_minima_mayorista")
+  precioConIva              Decimal @map("precio_con_iva")
+  precioSinIva              Decimal @map("precio_sin_iva")
+  margen                    Decimal @default(0.3)
+  precioPublico             Decimal @map("precio_publico")
+  precioMayorista           Decimal? @map("precio_mayorista")
+  cantidadMinimaMayorista   Decimal? @map("cantidad_minima_mayorista")
   vigente                   Boolean  @default(true)
   createdAt                 DateTime @default(now()) @map("created_at")
   updatedAt                 DateTime @updatedAt @map("updated_at")
@@ -176,9 +176,9 @@ model InventarioStock {
   articulo    Articulo @relation(fields: [articuloId], references: [id])
   sucursalId  String   @map("sucursal_id")
   sucursal    Sucursal @relation(fields: [sucursalId], references: [id])
-  stockActual Decimal  @default(0) @db.Decimal(12, 3) @map("stock_actual")
-  stockMinimo Decimal? @db.Decimal(12, 3) @map("stock_minimo")
-  stockMaximo Decimal? @db.Decimal(12, 3) @map("stock_maximo")
+  stockActual Decimal  @default(0) @map("stock_actual")
+  stockMinimo Decimal? @map("stock_minimo")
+  stockMaximo Decimal? @map("stock_maximo")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@unique([articuloId, sucursalId])
@@ -192,7 +192,7 @@ model InventarioMovimiento {
   sucursalId          String   @map("sucursal_id")
   sucursal            Sucursal @relation(fields: [sucursalId], references: [id])
   tipoMovimiento      String   @map("tipo_movimiento")
-  cantidad            Decimal  @db.Decimal(12, 3)
+  cantidad            Decimal
   documentoOrigenTipo String?  @map("documento_origen_tipo")
   documentoOrigenId   String?  @map("documento_origen_id")
   observacion         String?
@@ -264,11 +264,11 @@ model FacturaDetalle {
   codigoProductoProveedor  String?             @map("codigo_producto_proveedor")
   articuloId               String?             @map("articulo_id")
   articulo                 Articulo?           @relation(fields: [articuloId], references: [id])
-  cantidad                 Decimal             @db.Decimal(12, 3)
-  precioAcordado           Decimal?            @db.Decimal(12, 2) @map("precio_acordado")
-  precioFacturado          Decimal             @db.Decimal(12, 2) @map("precio_facturado")
+  cantidad                 Decimal
+  precioAcordado           Decimal? @map("precio_acordado")
+  precioFacturado          Decimal @map("precio_facturado")
   impuesto                 String?
-  totalLinea               Decimal             @db.Decimal(12, 2) @map("total_linea")
+  totalLinea               Decimal @map("total_linea")
   diferencia               FacturaDiferencia?
   createdAt                DateTime            @default(now()) @map("created_at")
 
@@ -281,7 +281,7 @@ model FacturaDiferencia {
   factura         Factura        @relation(fields: [facturaId], references: [id], onDelete: Cascade)
   detalleId       String         @unique @map("detalle_id")
   detalle         FacturaDetalle @relation(fields: [detalleId], references: [id], onDelete: Cascade)
-  montoDiferencia Decimal        @db.Decimal(12, 2) @map("monto_diferencia")
+  montoDiferencia Decimal @map("monto_diferencia")
   estado          String         @default("pendiente")
   observacion     String?
   createdAt       DateTime       @default(now()) @map("created_at")
@@ -301,10 +301,10 @@ model Venta {
   sucursal       Sucursal       @relation(fields: [sucursalId], references: [id])
   cajaId         String?        @map("caja_id")
   caja           Caja?          @relation(fields: [cajaId], references: [id])
-  total          Decimal        @default(0) @db.Decimal(12, 2)
-  totalPagado    Decimal        @default(0) @db.Decimal(12, 2) @map("total_pagado")
-  saldoPendiente Decimal        @default(0) @db.Decimal(12, 2) @map("saldo_pendiente")
-  vuelto         Decimal        @default(0) @db.Decimal(12, 2)
+  total          Decimal        @default(0)
+  totalPagado    Decimal        @default(0) @map("total_pagado")
+  saldoPendiente Decimal        @default(0) @map("saldo_pendiente")
+  vuelto         Decimal        @default(0)
   estado         String         @default("abierta")
   detalles       VentaDetalle[]
   pagos          VentaPago[]
@@ -321,9 +321,9 @@ model VentaDetalle {
   venta          Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   articuloId     String   @map("articulo_id")
   articulo       Articulo @relation(fields: [articuloId], references: [id])
-  cantidad       Decimal  @db.Decimal(12, 3)
-  precioUnitario Decimal  @db.Decimal(12, 2) @map("precio_unitario")
-  totalLinea     Decimal  @db.Decimal(12, 2) @map("total_linea")
+  cantidad       Decimal
+  precioUnitario Decimal @map("precio_unitario")
+  totalLinea     Decimal @map("total_linea")
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("venta_detalles")
@@ -334,7 +334,7 @@ model VentaPago {
   ventaId    String   @map("venta_id")
   venta      Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   metodoPago String   @map("metodo_pago")
-  monto      Decimal  @db.Decimal(12, 2)
+  monto      Decimal
   referencia String?
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -360,8 +360,8 @@ model Caja {
   estado         String           @default("abierta")
   fechaApertura  DateTime         @default(now()) @map("fecha_apertura")
   fechaCierre    DateTime?        @map("fecha_cierre")
-  montoInicial   Decimal          @db.Decimal(12, 2) @map("monto_inicial")
-  efectivoContado Decimal?        @db.Decimal(12, 2) @map("efectivo_contado")
+  montoInicial   Decimal @map("monto_inicial")
+  efectivoContado Decimal? @map("efectivo_contado")
   observacion    String?
   ventas         Venta[]
   aperturas      CajaApertura[]
@@ -376,7 +376,7 @@ model CajaApertura {
   id           String   @id @default(cuid())
   cajaId       String   @map("caja_id")
   caja         Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
-  montoInicial Decimal  @db.Decimal(12, 2) @map("monto_inicial")
+  montoInicial Decimal @map("monto_inicial")
   observacion  String?
   createdAt    DateTime @default(now()) @map("created_at")
 
@@ -387,8 +387,8 @@ model CajaCierre {
   id              String   @id @default(cuid())
   cajaId          String   @map("caja_id")
   caja            Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
-  efectivoContado Decimal  @db.Decimal(12, 2) @map("efectivo_contado")
-  diferencia      Decimal? @db.Decimal(12, 2)
+  efectivoContado Decimal @map("efectivo_contado")
+  diferencia      Decimal?
   observacion     String?
   createdAt       DateTime @default(now()) @map("created_at")
 
@@ -400,7 +400,7 @@ model CajaMovimiento {
   cajaId      String   @map("caja_id")
   caja        Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
   tipo        String
-  monto       Decimal  @db.Decimal(12, 2)
+  monto       Decimal
   concepto    String
   observacion String?
   createdAt   DateTime @default(now()) @map("created_at")
@@ -414,7 +414,7 @@ model Ensamblaje {
   productoFinal  Articulo               @relation("ProductoFinal", fields: [productoFinalId], references: [id])
   nombre         String
   estado         String                 @default("activo")
-  costoEstimado  Decimal?               @db.Decimal(12, 2) @map("costo_estimado")
+  costoEstimado  Decimal? @map("costo_estimado")
   observacion    String?
   componentes    EnsamblajeComponente[]
   movimientos    EnsamblajeMovimiento[]
@@ -430,8 +430,8 @@ model EnsamblajeComponente {
   ensamblaje         Ensamblaje  @relation(fields: [ensamblajeId], references: [id], onDelete: Cascade)
   componenteId       String      @map("componente_id")
   componente         Articulo    @relation("Componente", fields: [componenteId], references: [id])
-  cantidadRequerida  Decimal     @db.Decimal(12, 3) @map("cantidad_requerida")
-  costoComponente    Decimal?    @db.Decimal(12, 2) @map("costo_componente")
+  cantidadRequerida  Decimal @map("cantidad_requerida")
+  costoComponente    Decimal? @map("costo_componente")
 
   @@map("ensamblaje_componentes")
 }
@@ -441,7 +441,7 @@ model EnsamblajeMovimiento {
   ensamblajeId   String      @map("ensamblaje_id")
   ensamblaje     Ensamblaje  @relation(fields: [ensamblajeId], references: [id])
   tipo           String
-  cantidad       Decimal     @db.Decimal(12, 3)
+  cantidad       Decimal
   motivo         String?
   createdAt      DateTime    @default(now()) @map("created_at")
 
@@ -466,7 +466,7 @@ model ReporteConfiguracion {
   id        String   @id @default(cuid())
   codigo    String   @unique
   nombre    String
-  filtros   Json?
+  filtros   String?
   estado    String   @default("activo")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

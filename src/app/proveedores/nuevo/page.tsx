@@ -1,19 +1,63 @@
+import { Save } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { crearProveedorAction } from "@/app/actions/proveedores.actions";
 
 export default function NuevoProveedorPage() {
   return (
-    <AppShell>
-      <section className="max-w-4xl rounded-md border border-line bg-white p-5 shadow-subtle">
-        <h2 className="text-2xl font-semibold text-ink">Nuevo proveedor</h2>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {["Código", "RUT/RUC", "Razón social", "Nombre comercial", "Contacto", "Correo"].map((label) => (
-            <label key={label} className="block">
-              <span className="text-sm font-medium text-slate-700">{label}</span>
-              <input className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-brand-600" />
+    <AppShell title="Nuevo Proveedor" subtitle="Datos fiscales, comerciales y de contacto">
+      <form action={crearProveedorAction} className="space-y-5">
+        <section className="sagva-panel">
+          <div className="sagva-panel-title">Información del proveedor</div>
+          <div className="grid gap-4 p-4 md:grid-cols-4">
+            <label>
+              <span className="sagva-label">Código *</span>
+              <input name="codigo" className="sagva-field" required />
             </label>
-          ))}
+            <label>
+              <span className="sagva-label">RUT/RUC *</span>
+              <input name="rutRuc" className="sagva-field" required />
+            </label>
+            <label className="md:col-span-2">
+              <span className="sagva-label">Razón social *</span>
+              <input name="razonSocial" className="sagva-field" required />
+            </label>
+            <label className="md:col-span-2">
+              <span className="sagva-label">Nombre comercial</span>
+              <input name="nombreComercial" className="sagva-field" />
+            </label>
+            <label className="md:col-span-2">
+              <span className="sagva-label">Dirección</span>
+              <input name="direccion" className="sagva-field" />
+            </label>
+            <label>
+              <span className="sagva-label">Teléfono</span>
+              <input name="telefono" className="sagva-field" />
+            </label>
+            <label>
+              <span className="sagva-label">Correo</span>
+              <input name="correo" type="email" className="sagva-field" />
+            </label>
+            <label className="md:col-span-2">
+              <span className="sagva-label">Contacto</span>
+              <input name="contacto" className="sagva-field" />
+            </label>
+            <label className="md:col-span-4">
+              <span className="sagva-label">Condiciones comerciales</span>
+              <textarea name="condicionesComerciales" className="sagva-field min-h-24" />
+            </label>
+          </div>
+        </section>
+
+        <div className="flex justify-end gap-3">
+          <a href="/proveedores" className="sagva-button-secondary">
+            Cancelar
+          </a>
+          <button className="inline-flex items-center gap-2 sagva-button-primary">
+            <Save className="h-4 w-4" aria-hidden="true" />
+            Guardar proveedor
+          </button>
         </div>
-      </section>
+      </form>
     </AppShell>
   );
 }

@@ -1,19 +1,19 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { ArticuloForm } from "@/components/forms/articulo-form";
+import { prisma } from "@/lib/prisma";
 
-export default function NuevoArticuloPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NuevoArticuloPage() {
+  const [familias, subfamilias, marcas] = await Promise.all([
+    prisma.familia.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.subfamilia.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.marca.findMany({ orderBy: { nombre: "asc" } })
+  ]);
+
   return (
-    <AppShell>
-      <section className="max-w-4xl rounded-md border border-line bg-white p-5 shadow-subtle">
-        <h2 className="text-2xl font-semibold text-ink">Nuevo artículo</h2>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {["Código producto", "Nombre", "Unidad medida", "Tipo impuesto", "Precio con IVA", "Margen"].map((label) => (
-            <label key={label} className="block">
-              <span className="text-sm font-medium text-slate-700">{label}</span>
-              <input className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-brand-600" />
-            </label>
-          ))}
-        </div>
-      </section>
+    <AppShell title="Nuevo Artículo" subtitle="Crear ficha, precios y stock inicial">
+      <ArticuloForm familias={familias} subfamilias={subfamilias} marcas={marcas} />
     </AppShell>
   );
 }
