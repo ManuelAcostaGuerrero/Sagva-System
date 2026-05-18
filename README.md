@@ -37,6 +37,75 @@ Archivos principales:
 
 Convierte los blueprints de Sagva System en una estructura técnica inicial con rutas, carpetas, servicios, modelos, pantallas base, contratos de integración y base de datos mínima para comenzar el desarrollo modular.
 
+## Aplicación técnica inicial
+
+Esta versión ya incluye una base armable con:
+
+- Next.js + React + TypeScript.
+- TailwindCSS.
+- Prisma.
+- PostgreSQL.
+- Rutas base por módulo.
+- Layout principal y menú lateral.
+- Pantalla de login base.
+- Servicios iniciales por módulo.
+- Tipos compartidos.
+- Esquema de base de datos inicial.
+- Seed con roles, usuario admin y catálogos base.
+
+## Instalación local
+
+1. Instalar dependencias:
+
+```bash
+npm install
+```
+
+2. Crear archivo `.env` usando `.env.example` como base:
+
+```bash
+DATABASE_URL="postgresql://sagva:sagva_password@localhost:5432/sagva_system?schema=public"
+NEXTAUTH_SECRET="change-this-secret"
+APP_URL="http://localhost:3000"
+```
+
+3. Generar cliente Prisma:
+
+```bash
+npm run prisma:generate
+```
+
+4. Crear/actualizar tablas:
+
+```bash
+npm run db:push
+```
+
+5. Cargar datos iniciales:
+
+```bash
+npm run db:seed
+```
+
+6. Levantar la aplicación:
+
+```bash
+npm run dev
+```
+
+La aplicación queda disponible en:
+
+```text
+http://localhost:3000
+```
+
+Usuario inicial:
+
+```text
+admin@sagva.local
+admin123
+```
+
 ## Principio modular
 
 Cada módulo debe:
