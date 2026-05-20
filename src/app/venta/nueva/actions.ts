@@ -66,12 +66,12 @@ export async function guardarVentaAction(formData: FormData) {
     redirect("/login");
   }
 
-  const accion = stringValue(formData, "accion") || "pendiente";
+  const quickMetodo = stringValue(formData, "quickMetodo").toLowerCase();
+  const accion = quickMetodo ? "cobrar" : stringValue(formData, "accion") || "pendiente";
   const sucursalId = stringValue(formData, "sucursalId");
   const cajaId = stringValue(formData, "cajaId");
   const clienteNombre = stringValue(formData, "cliente");
   const observacion = stringValue(formData, "observacion");
-  const quickMetodo = stringValue(formData, "quickMetodo").toLowerCase();
   const efectivoRecibido = Number(stringValue(formData, "efectivoRecibido") || 0);
   const lineas = jsonValue<LineaVentaInput[]>(formData, "lineas", []);
   const pagos = jsonValue<PagoVentaInput[]>(formData, "pagos", []);
