@@ -676,24 +676,43 @@ export function VentasNuevaClient({
                         </td>
                         <td>{money(linea.precioUnitario)}</td>
                         <td>
-                          <div className="flex min-w-44 items-center gap-2">
-                            <select
-                              className="sagva-field w-24"
-                              value={linea.descuentoTipo}
-                              onMouseDown={(event) => {
-                                if (!descuentoAutorizado) {
-                                  event.preventDefault();
-                                  solicitarAutorizacionDescuento(linea);
-                                }
-                              }}
-                              onChange={(event) => {
-                                if (!descuentoAutorizado) return;
-                                cambiarTipoDescuento(linea.articuloId, event.target.value as TipoDescuento);
-                              }}
-                            >
-                              <option value="monto">Monto</option>
-                              <option value="porcentaje">%</option>
-                            </select>
+                          <div className="flex min-w-48 items-center gap-2">
+                            <div className="flex rounded-md border border-[#d8dee8] bg-white p-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!descuentoAutorizado) {
+                                    solicitarAutorizacionDescuento(linea);
+                                    return;
+                                  }
+                                  cambiarTipoDescuento(linea.articuloId, "monto");
+                                }}
+                                className={`rounded px-2 py-1 text-xs font-bold ${
+                                  linea.descuentoTipo === "monto"
+                                    ? "bg-blue-50 text-[#064ea4]"
+                                    : "text-slate-500"
+                                }`}
+                              >
+                                $
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!descuentoAutorizado) {
+                                    solicitarAutorizacionDescuento(linea);
+                                    return;
+                                  }
+                                  cambiarTipoDescuento(linea.articuloId, "porcentaje");
+                                }}
+                                className={`rounded px-2 py-1 text-xs font-bold ${
+                                  linea.descuentoTipo === "porcentaje"
+                                    ? "bg-blue-50 text-[#064ea4]"
+                                    : "text-slate-500"
+                                }`}
+                              >
+                                %
+                              </button>
+                            </div>
                             <input
                               ref={(node) => {
                                 descuentoInputRefs.current[linea.articuloId] = node;
@@ -703,6 +722,7 @@ export function VentasNuevaClient({
                               min={0}
                               max={linea.descuentoTipo === "porcentaje" ? MAX_DESCUENTO_PORCENTAJE_TEMPORAL : undefined}
                               value={linea.descuentoValor}
+                              placeholder={linea.descuentoTipo === "porcentaje" ? "%" : "$"}
                               readOnly={!descuentoAutorizado}
                               onFocus={(event) => {
                                 if (!descuentoAutorizado) {
