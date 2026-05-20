@@ -247,5 +247,5 @@ export async function guardarVentaAction(formData: FormData) {
   revalidatePath("/inventario");
   revalidatePath("/caja");
 
-  redirect(accion === "cobrar" ? "/venta/abiertas?success=cobrada" : "/venta/abiertas?success=pendiente");
+  redirect(accion === "cobrar" ? "/venta/nueva?success=cobrada" : "/venta/abiertas?success=pendiente");
 }
