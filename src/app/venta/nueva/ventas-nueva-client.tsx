@@ -95,7 +95,9 @@ function totalPagadoVenta(pagos: PagoVenta[]) {
   return pagos.reduce((sum, pago) => sum + pago.monto, 0);
 }
 
-function calcularDescuento(linea: Pick<LineaVenta, "cantidad" | "precioUnitario" | "descuentoTipo" | "descuentoValor">) {
+function calcularDescuento(
+  linea: Pick<LineaVenta, "cantidad" | "precioUnitario" | "descuentoTipo" | "descuentoValor">,
+) {
   const bruto = Math.max(linea.cantidad * linea.precioUnitario, 0);
   const valor = Math.max(Number(linea.descuentoValor) || 0, 0);
   const porcentaje = Math.min(valor, MAX_DESCUENTO_PORCENTAJE_TEMPORAL);
@@ -119,14 +121,16 @@ export function VentasNuevaClient({
   sucursalNombre,
 }: NuevaVentaClientProps) {
   const formRef = useRef<HTMLFormElement>(null);
+  const quickMetodoInputRef = useRef<HTMLInputElement>(null);
+  const efectivoRecibidoInputRef = useRef<HTMLInputElement>(null);
   const efectivoInputRef = useRef<HTMLInputElement>(null);
   const pinDescuentoInputRef = useRef<HTMLInputElement>(null);
   const descuentoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const primeraVentaRef = useRef(crearVentaTemporal(1));
+
   const [busqueda, setBusqueda] = useState("");
   const [ventas, setVentas] = useState<VentaTemporal[]>(() => [primeraVentaRef.current]);
   const [ventaActivaId, setVentaActivaId] = useState(() => primeraVentaRef.current.id);
-  const [quickMetodo, setQuickMetodo] = useState("");
   const [efectivoRecibido, setEfectivoRecibido] = useState("");
   const [dialogoEfectivoAbierto, setDialogoEfectivoAbierto] = useState(false);
   const [dialogoDescuento, setDialogoDescuento] = useState<DialogoDescuento | null>(null);
@@ -136,7 +140,6 @@ export function VentasNuevaClient({
   const [bannerVuelto, setBannerVuelto] = useState<{ pago: number; vuelto: number } | null>(null);
 
   const ventaActiva = ventas.find((venta) => venta.id === ventaActivaId) ?? ventas[0];
-
   const lineas = ventaActiva?.lineas ?? [];
   const pagos = ventaActiva?.pagos ?? [];
   const cliente = ventaActiva?.cliente ?? "";
@@ -149,16 +152,12 @@ export function VentasNuevaClient({
     if (!q) return [];
 
     return productos
-      .filter((producto) => {
-        return [
-          producto.codigoProducto,
-          producto.codigoBarra ?? "",
-          producto.nombreArticulo,
-        ]
+      .filter((producto) =>
+        [producto.codigoProducto, producto.codigoBarra ?? "", producto.nombreArticulo]
           .join(" ")
           .toLowerCase()
-          .includes(q);
-      })
+          .includes(q),
+      )
       .slice(0, 8);
   }, [busqueda, productos]);
 
@@ -166,12 +165,7 @@ export function VentasNuevaClient({
     () => lineas.reduce((sum, linea) => sum + linea.cantidad * linea.precioUnitario, 0),
     [lineas],
   );
-
-  const descuentoTotal = useMemo(
-    () => lineas.reduce((sum, linea) => sum + linea.descuento, 0),
-    [lineas],
-  );
-
+  const descuentoTotal = useMemo(() => lineas.reduce((sum, linea) => sum + linea.descuento, 0), [lineas]);
   const total = useMemo(() => totalVenta(lineas), [lineas]);
   const totalPagado = useMemo(() => totalPagadoVenta(pagos), [pagos]);
   const saldoPendiente = Math.max(total - totalPagado, 0);
@@ -243,9 +237,16 @@ export function VentasNuevaClient({
   });
 
   function actualizarVentaActiva(updater: (venta: VentaTemporal) => VentaTemporal) {
-    setVentas((current) =>
-      current.map((venta) => (venta.id === ventaActivaId ? updater(venta) : venta)),
-    );
+    setVentas((current) => current.map((venta) => (venta.id === ventaActivaId ? updater(venta) : venta)));
+  }
+
+  function prepararCobroRapido(metodo: string, efectivo = "") {
+    if (quickMetodoInputRef.current) quickMetodoInputRef.current.value = metodo;
+    if (efectivoRecibidoInputRef.current) efectivoRecibidoInputRef.current.value = efectivo;
+  }
+
+  function limpiarCobroRapido() {
+    prepararCobroRapido("", "");
   }
 
   function crearNuevaInstanciaVenta() {
@@ -254,10 +255,10 @@ export function VentasNuevaClient({
     setVentas((current) => [...current, nuevaVenta]);
     setVentaActivaId(nuevaVenta.id);
     setBusqueda("");
-    setQuickMetodo("");
     setEfectivoRecibido("");
     setDialogoEfectivoAbierto(false);
     setDialogoDescuento(null);
+    limpiarCobroRapido();
   }
 
   function cerrarVentaTemporal(id: string) {
@@ -268,25 +269,23 @@ export function VentasNuevaClient({
 
     setVentas((current) => {
       const filtradas = current.filter((venta) => venta.id !== id);
-      if (id === ventaActivaId) {
-        setVentaActivaId(filtradas[0]?.id ?? crearVentaTemporal(1).id);
-      }
+      if (id === ventaActivaId) setVentaActivaId(filtradas[0]?.id ?? crearVentaTemporal(1).id);
       return filtradas.length ? filtradas : [crearVentaTemporal(1)];
     });
   }
 
   function agregarProducto(producto: ProductoVenta) {
     setBannerVuelto(null);
+    limpiarCobroRapido();
     actualizarVentaActiva((venta) => {
       const existente = venta.lineas.find((linea) => linea.articuloId === producto.articuloId);
 
       if (existente) {
         return {
           ...venta,
-          lineas: venta.lineas.map((linea) => {
-            if (linea.articuloId !== producto.articuloId) return linea;
-            return recalcularLinea({ ...linea, cantidad: linea.cantidad + 1 });
-          }),
+          lineas: venta.lineas.map((linea) =>
+            linea.articuloId === producto.articuloId ? recalcularLinea({ ...linea, cantidad: linea.cantidad + 1 }) : linea,
+          ),
         };
       }
 
@@ -315,10 +314,9 @@ export function VentasNuevaClient({
   function cambiarCantidad(articuloId: string, cantidad: number) {
     actualizarVentaActiva((venta) => ({
       ...venta,
-      lineas: venta.lineas.map((linea) => {
-        if (linea.articuloId !== articuloId) return linea;
-        return recalcularLinea({ ...linea, cantidad: Math.max(cantidad, 1) });
-      }),
+      lineas: venta.lineas.map((linea) =>
+        linea.articuloId === articuloId ? recalcularLinea({ ...linea, cantidad: Math.max(cantidad, 1) }) : linea,
+      ),
     }));
   }
 
@@ -328,7 +326,6 @@ export function VentasNuevaClient({
 
   function solicitarAutorizacionDescuento(linea: LineaVenta) {
     if (descuentoEstaAutorizado(linea.articuloId)) return true;
-
     setDialogoDescuento({ articuloId: linea.articuloId, nombreArticulo: linea.nombreArticulo });
     setPinDescuento("");
     setErrorPinDescuento("");
@@ -358,10 +355,9 @@ export function VentasNuevaClient({
   function cambiarTipoDescuento(articuloId: string, descuentoTipo: TipoDescuento) {
     actualizarVentaActiva((venta) => ({
       ...venta,
-      lineas: venta.lineas.map((linea) => {
-        if (linea.articuloId !== articuloId) return linea;
-        return recalcularLinea({ ...linea, descuentoTipo, descuentoValor: 0 });
-      }),
+      lineas: venta.lineas.map((linea) =>
+        linea.articuloId === articuloId ? recalcularLinea({ ...linea, descuentoTipo, descuentoValor: 0 }) : linea,
+      ),
     }));
   }
 
@@ -370,9 +366,10 @@ export function VentasNuevaClient({
       ...venta,
       lineas: venta.lineas.map((linea) => {
         if (linea.articuloId !== articuloId) return linea;
-        const valorLimitado = linea.descuentoTipo === "porcentaje"
-          ? Math.min(Math.max(descuentoValor, 0), MAX_DESCUENTO_PORCENTAJE_TEMPORAL)
-          : Math.max(descuentoValor, 0);
+        const valorLimitado =
+          linea.descuentoTipo === "porcentaje"
+            ? Math.min(Math.max(descuentoValor, 0), MAX_DESCUENTO_PORCENTAJE_TEMPORAL)
+            : Math.max(descuentoValor, 0);
         return recalcularLinea({ ...linea, descuentoValor: valorLimitado });
       }),
     }));
@@ -401,12 +398,12 @@ export function VentasNuevaClient({
       montoPago: "",
     }));
     setBusqueda("");
-    setQuickMetodo("");
     setEfectivoRecibido("");
     setDialogoEfectivoAbierto(false);
     setDialogoDescuento(null);
     setDescuentosAutorizados({});
     setBannerVuelto(null);
+    limpiarCobroRapido();
   }
 
   function agregarPago() {
@@ -436,6 +433,7 @@ export function VentasNuevaClient({
       ...venta,
       pagos: venta.pagos.filter((pago) => pago.id !== pagoId),
     }));
+    limpiarCobroRapido();
   }
 
   function seleccionarMetodoPago(metodo: string) {
@@ -444,6 +442,7 @@ export function VentasNuevaClient({
       metodoPago: metodo,
       montoPago: saldoPendiente > 0 ? String(saldoPendiente) : "",
     }));
+    limpiarCobroRapido();
   }
 
   function iniciarCobroRapido(metodo: string) {
@@ -451,22 +450,21 @@ export function VentasNuevaClient({
     setBannerVuelto(null);
 
     if (metodo === "efectivo") {
-      setQuickMetodo("efectivo");
       setEfectivoRecibido(String(total));
+      prepararCobroRapido("efectivo", String(total));
       setDialogoEfectivoAbierto(true);
       return;
     }
 
-    setQuickMetodo(metodo);
-    setEfectivoRecibido("");
-    setTimeout(() => formRef.current?.requestSubmit(), 0);
+    prepararCobroRapido(metodo, "");
+    formRef.current?.requestSubmit();
   }
 
   function confirmarEfectivo() {
     const pago = Number(efectivoRecibido);
     if (!Number.isFinite(pago) || pago < total) return;
-    setQuickMetodo("efectivo");
-    setTimeout(() => formRef.current?.requestSubmit(), 0);
+    prepararCobroRapido("efectivo", String(pago));
+    formRef.current?.requestSubmit();
   }
 
   return (
@@ -532,8 +530,8 @@ export function VentasNuevaClient({
         <input type="hidden" name="observacion" value={observacion} />
         <input type="hidden" name="lineas" value={lineasPayload} />
         <input type="hidden" name="pagos" value={pagosPayload} />
-        <input type="hidden" name="quickMetodo" value={quickMetodo} />
-        <input type="hidden" name="efectivoRecibido" value={efectivoRecibido} />
+        <input ref={quickMetodoInputRef} type="hidden" name="quickMetodo" defaultValue="" />
+        <input ref={efectivoRecibidoInputRef} type="hidden" name="efectivoRecibido" defaultValue="" />
 
         <div className="space-y-5">
           <div className="sagva-panel p-5">
@@ -543,9 +541,7 @@ export function VentasNuevaClient({
                 <input
                   className="sagva-field"
                   value={cliente}
-                  onChange={(event) =>
-                    actualizarVentaActiva((venta) => ({ ...venta, cliente: event.target.value }))
-                  }
+                  onChange={(event) => actualizarVentaActiva((venta) => ({ ...venta, cliente: event.target.value }))}
                   placeholder="Cliente general o RUT/RUC"
                 />
               </div>
@@ -586,9 +582,7 @@ export function VentasNuevaClient({
                           type="button"
                           onClick={() => agregarProducto(producto)}
                           className={`flex w-full items-center justify-between gap-4 border-b px-4 py-3 text-left last:border-b-0 ${
-                            sinStock
-                              ? "border-amber-200 bg-amber-50 hover:bg-amber-100"
-                              : "border-[#eef2f7] hover:bg-blue-50"
+                            sinStock ? "border-amber-200 bg-amber-50 hover:bg-amber-100" : "border-[#eef2f7] hover:bg-blue-50"
                           }`}
                         >
                           <div>
@@ -617,9 +611,7 @@ export function VentasNuevaClient({
                     })}
 
                     {productosFiltrados.length === 0 ? (
-                      <div className="px-4 py-5 text-sm text-slate-500">
-                        No se encontraron productos para esa búsqueda.
-                      </div>
+                      <div className="px-4 py-5 text-sm text-slate-500">No se encontraron productos para esa búsqueda.</div>
                     ) : null}
                   </div>
                 ) : null}
@@ -669,9 +661,7 @@ export function VentasNuevaClient({
                             value={linea.cantidad}
                             onFocus={(event) => event.currentTarget.select()}
                             onClick={(event) => event.currentTarget.select()}
-                            onChange={(event) =>
-                              cambiarCantidad(linea.articuloId, Number(event.target.value))
-                            }
+                            onChange={(event) => cambiarCantidad(linea.articuloId, Number(event.target.value))}
                           />
                         </td>
                         <td>{money(linea.precioUnitario)}</td>
@@ -681,16 +671,11 @@ export function VentasNuevaClient({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (!descuentoAutorizado) {
-                                    solicitarAutorizacionDescuento(linea);
-                                    return;
-                                  }
+                                  if (!descuentoAutorizado) return void solicitarAutorizacionDescuento(linea);
                                   cambiarTipoDescuento(linea.articuloId, "monto");
                                 }}
                                 className={`rounded px-2 py-1 text-xs font-bold ${
-                                  linea.descuentoTipo === "monto"
-                                    ? "bg-blue-50 text-[#064ea4]"
-                                    : "text-slate-500"
+                                  linea.descuentoTipo === "monto" ? "bg-blue-50 text-[#064ea4]" : "text-slate-500"
                                 }`}
                               >
                                 $
@@ -698,16 +683,11 @@ export function VentasNuevaClient({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (!descuentoAutorizado) {
-                                    solicitarAutorizacionDescuento(linea);
-                                    return;
-                                  }
+                                  if (!descuentoAutorizado) return void solicitarAutorizacionDescuento(linea);
                                   cambiarTipoDescuento(linea.articuloId, "porcentaje");
                                 }}
                                 className={`rounded px-2 py-1 text-xs font-bold ${
-                                  linea.descuentoTipo === "porcentaje"
-                                    ? "bg-blue-50 text-[#064ea4]"
-                                    : "text-slate-500"
+                                  linea.descuentoTipo === "porcentaje" ? "bg-blue-50 text-[#064ea4]" : "text-slate-500"
                                 }`}
                               >
                                 %
@@ -746,12 +726,8 @@ export function VentasNuevaClient({
                               }}
                             />
                           </div>
-                          {!descuentoAutorizado ? (
-                            <p className="mt-1 text-xs text-amber-700">Requiere autorización</p>
-                          ) : null}
-                          {linea.descuento > 0 ? (
-                            <p className="mt-1 text-xs text-slate-500">-{money(linea.descuento)}</p>
-                          ) : null}
+                          {!descuentoAutorizado ? <p className="mt-1 text-xs text-amber-700">Requiere autorización</p> : null}
+                          {linea.descuento > 0 ? <p className="mt-1 text-xs text-slate-500">-{money(linea.descuento)}</p> : null}
                         </td>
                         <td className="font-bold text-slate-950">{money(linea.totalLinea)}</td>
                         <td>
@@ -784,9 +760,7 @@ export function VentasNuevaClient({
             <textarea
               className="sagva-field mt-3 min-h-20"
               value={observacion}
-              onChange={(event) =>
-                actualizarVentaActiva((venta) => ({ ...venta, observacion: event.target.value }))
-              }
+              onChange={(event) => actualizarVentaActiva((venta) => ({ ...venta, observacion: event.target.value }))}
               placeholder="Observaciones internas de la venta"
             />
           </div>
@@ -882,9 +856,7 @@ export function VentasNuevaClient({
                   onClick={() => seleccionarMetodoPago(metodo)}
                   disabled={!puedeAgregarPago}
                   className={`rounded-md border px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50 ${
-                    metodoPago === metodo
-                      ? "border-[#064ea4] bg-blue-50 text-[#064ea4]"
-                      : "border-[#d8dee8] bg-white text-slate-700"
+                    metodoPago === metodo ? "border-[#064ea4] bg-blue-50 text-[#064ea4]" : "border-[#d8dee8] bg-white text-slate-700"
                   }`}
                 >
                   {metodo}
@@ -935,10 +907,7 @@ export function VentasNuevaClient({
 
             <div className="mt-4 space-y-2">
               {pagos.map((pago) => (
-                <div
-                  key={pago.id}
-                  className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-sm"
-                >
+                <div key={pago.id} className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-sm">
                   <span className="font-bold">{pago.metodo}</span>
                   <div className="flex items-center gap-2">
                     <span>{money(pago.monto)}</span>
@@ -954,9 +923,7 @@ export function VentasNuevaClient({
                 </div>
               ))}
               {pagos.length === 0 ? (
-                <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
-                  No hay pagos registrados.
-                </p>
+                <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">No hay pagos registrados.</p>
               ) : null}
             </div>
           </div>
@@ -967,6 +934,7 @@ export function VentasNuevaClient({
               name="accion"
               value="cobrar"
               disabled={!lineas.length || saldoPendiente > 0 || !cajaActiva}
+              onClick={limpiarCobroRapido}
               className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cobrar venta
@@ -976,6 +944,7 @@ export function VentasNuevaClient({
               name="accion"
               value="pendiente"
               disabled={!lineas.length}
+              onClick={limpiarCobroRapido}
               className="sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
               Guardar pendiente
@@ -1013,7 +982,7 @@ export function VentasNuevaClient({
                 }
                 if (event.key === "Escape") {
                   setDialogoEfectivoAbierto(false);
-                  setQuickMetodo("");
+                  limpiarCobroRapido();
                 }
               }}
             />
@@ -1025,7 +994,7 @@ export function VentasNuevaClient({
                 type="button"
                 onClick={() => {
                   setDialogoEfectivoAbierto(false);
-                  setQuickMetodo("");
+                  limpiarCobroRapido();
                 }}
                 className="sagva-button-secondary"
               >
@@ -1074,9 +1043,7 @@ export function VentasNuevaClient({
               }}
             />
             {errorPinDescuento ? (
-              <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-                {errorPinDescuento}
-              </p>
+              <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{errorPinDescuento}</p>
             ) : null}
             <p className="mt-3 text-xs text-slate-500">
               Esta autorización es temporal. Luego debe venir desde el módulo de Seguridad.
@@ -1093,11 +1060,7 @@ export function VentasNuevaClient({
               >
                 Cancelar
               </button>
-              <button
-                type="button"
-                onClick={confirmarAutorizacionDescuento}
-                className="sagva-button-primary"
-              >
+              <button type="button" onClick={confirmarAutorizacionDescuento} className="sagva-button-primary">
                 Autorizar
               </button>
             </div>
