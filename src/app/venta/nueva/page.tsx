@@ -1,17 +1,93 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { ModulePage } from "@/components/modules/module-page";
+import { prisma } from "@/lib/prisma";
+import { VentasNuevaClient } from "./ventas-nueva-client";
 
-export default function NuevaVentaPage() {
+export const dynamic = "force-dynamic";
+
+function toNumber(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  if (value && typeof value === "object" && "toString" in value) {
+    return Number(value.toString());
+  }
+  return 0;
+}
+
+export default async function NuevaVentaPage() {
+  const sucursal = await prisma.sucursal.findFirst({
+    orderBy: { createdAt: "asc" },
+  });
+
+  const cajaActiva = sucursal
+    ? await prisma.caja.findFirst({
+        where: {
+          sucursalId: sucursal.id,
+          estado: "abierta",
+        },
+        orderBy: { fechaApertura: "desc" },
+      })
+    : null;
+
+  const productos = sucursal
+    ? await prisma.articulo.findMany({
+        where: {
+          estado: "activo",
+        },
+        include: {
+          precios: {
+            where: { vigente: true },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+          stocks: {
+            where: { sucursalId: sucursal.id },
+            take: 1,
+          },
+        },
+        orderBy: { nombre: "asc" },
+        take: 80,
+      })
+    : [];
+
+  const productosVenta = productos.map((articulo) => {
+    const precio = articulo.precios[0];
+    const stock = articulo.stocks[0];
+
+    return {
+      articuloId: articulo.id,
+      codigoProducto: articulo.codigoProducto,
+      codigoBarra: articulo.codigoBarra,
+      nombreArticulo: articulo.nombre,
+      precioPublico: toNumber(precio?.precioPublico),
+      stockDisponible: toNumber(stock?.stockActual),
+      controlaStock: true,
+    };
+  });
+
   return (
-    <AppShell>
-      <ModulePage
-        title="Nueva venta"
-        description="Base para ventas temporales, productos, pagos parciales, cobro final, anulaciones y préstamos retornables."
-        primaryAction={{ label: "Ventas abiertas", href: "/venta/abiertas" }}
-        screens={["Nueva venta", "Productos", "Pagos", "Cobro final", "Productos sugeridos"]}
-        service="VentaService"
-        pending={["Decidir venta con saldo pendiente", "Definir estados finales", "Cerrar reglas de préstamos"]}
-      />
+    <AppShell
+      title="Nueva venta"
+      subtitle="Venta temporal, productos, pagos múltiples y cierre de cobro"
+    >
+      {!sucursal ? (
+        <div className="sagva-panel p-6 text-sm text-slate-600">
+          No existe una sucursal configurada. Crea una sucursal antes de vender.
+        </div>
+      ) : (
+        <VentasNuevaClient
+          productos={productosVenta}
+          sucursalNombre={sucursal.nombre}
+          cajaActiva={
+            cajaActiva
+              ? {
+                  id: cajaActiva.id,
+                  nombre: `Caja ${cajaActiva.id.slice(0, 6)}`,
+                  estado: cajaActiva.estado,
+                }
+              : null
+          }
+        />
+      )}
     </AppShell>
   );
 }
