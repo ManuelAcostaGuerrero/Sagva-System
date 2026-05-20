@@ -15,7 +15,6 @@ type LineaVentaInput = {
 type PagoVentaInput = {
   metodo: string;
   monto: number;
-  referencia?: string | null;
 };
 
 function jsonValue<T>(formData: FormData, key: string, fallback: T): T {
@@ -114,7 +113,6 @@ export async function guardarVentaAction(formData: FormData) {
     .map((pago) => ({
       metodo: String(pago.metodo || "EFECTIVO").toLowerCase(),
       monto: Number(pago.monto),
-      referencia: pago.referencia?.trim() || null,
     }))
     .filter((pago) => Number.isFinite(pago.monto) && pago.monto > 0);
 
@@ -128,7 +126,6 @@ export async function guardarVentaAction(formData: FormData) {
         {
           metodo: "efectivo",
           monto: toMoney(efectivoRecibido),
-          referencia: "Pago rápido F2",
         },
       ];
     } else {
@@ -136,7 +133,6 @@ export async function guardarVentaAction(formData: FormData) {
         {
           metodo: quickMetodo,
           monto: total,
-          referencia: "Pago rápido",
         },
       ];
     }
@@ -235,7 +231,6 @@ export async function guardarVentaAction(formData: FormData) {
           ventaId: venta.id,
           metodoPago: pago.metodo,
           monto: pago.monto,
-          referencia: pago.referencia,
         },
       });
 
@@ -246,9 +241,7 @@ export async function guardarVentaAction(formData: FormData) {
             tipo: "venta",
             monto: pago.monto,
             concepto: `BOLETA:${folioDefinitivo ?? venta.id}`,
-            observacion: pago.referencia
-              ? `${pago.metodo.toUpperCase()} - ${pago.referencia}`
-              : pago.metodo.toUpperCase(),
+            observacion: pago.metodo.toUpperCase(),
           },
         });
       }
