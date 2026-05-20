@@ -4,16 +4,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { moduleSensitiveFields, permissionActions } from "@/config/permissions.config";
 import { prisma } from "@/lib/prisma";
-import { optionalStringValue, stringValue } from "@/lib/form-utils";
+import { stringValue } from "@/lib/form-utils";
 
 export async function createRoleAction(formData: FormData) {
   const codigo = stringValue(formData, "codigo").toLowerCase();
   const nombre = stringValue(formData, "nombre");
-  const descripcion = optionalStringValue(formData, "descripcion");
 
   if (!codigo || !nombre) redirect("/seguridad/roles?error=campos");
 
-  const rol = await prisma.rol.create({ data: { codigo, nombre, descripcion } });
+  const rol = await prisma.rol.create({ data: { codigo, nombre } });
 
   await prisma.auditoria.create({
     data: {
@@ -21,7 +20,7 @@ export async function createRoleAction(formData: FormData) {
       accion: "crear_rol",
       entidad: "Rol",
       entidadId: rol.id,
-      datoNuevo: JSON.stringify({ codigo, nombre, descripcion }),
+      datoNuevo: JSON.stringify({ codigo, nombre }),
       motivo: "Creacion de rol"
     }
   });
@@ -34,14 +33,13 @@ export async function createRoleAction(formData: FormData) {
 export async function updateRoleAction(id: string, formData: FormData) {
   const codigo = stringValue(formData, "codigo").toLowerCase();
   const nombre = stringValue(formData, "nombre");
-  const descripcion = optionalStringValue(formData, "descripcion");
 
   if (!id || !codigo || !nombre) redirect("/seguridad/roles?error=campos");
 
   const before = await prisma.rol.findUnique({ where: { id } });
   if (!before) redirect("/seguridad/roles?error=no_existe");
 
-  const after = await prisma.rol.update({ where: { id }, data: { codigo, nombre, descripcion } });
+  const after = await prisma.rol.update({ where: { id }, data: { codigo, nombre, descripcion: null } });
 
   await prisma.auditoria.create({
     data: {
@@ -49,8 +47,8 @@ export async function updateRoleAction(id: string, formData: FormData) {
       accion: "actualizar_rol",
       entidad: "Rol",
       entidadId: id,
-      datoAnterior: JSON.stringify({ codigo: before.codigo, nombre: before.nombre, descripcion: before.descripcion }),
-      datoNuevo: JSON.stringify({ codigo: after.codigo, nombre: after.nombre, descripcion: after.descripcion }),
+      datoAnterior: JSON.stringify({ codigo: before.codigo, nombre: before.nombre }),
+      datoNuevo: JSON.stringify({ codigo: after.codigo, nombre: after.nombre }),
       motivo: "Actualizacion de rol"
     }
   });
@@ -59,11 +57,44 @@ export async function updateRoleAction(id: string, formData: FormData) {
   revalidatePath("/seguridad/auditoria");
 }
 
+export async function deleteRoleAction(id: string) {
+  if (!id) redirect("/seguridad/roles?error=rol");
+
+  const rol = await prisma.rol.findUnique({
+    where: { id },
+    include: { usuarios: true, permisos: true }
+  });
+
+  if (!rol) redirect("/seguridad/roles?error=no_existe");
+  if (rol.usuarios.length > 0) redirect("/seguridad/roles?error=rol_en_uso");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.permiso.deleteMany({ where: { rolId: id } });
+    await tx.rol.delete({ where: { id } });
+    await tx.auditoria.create({
+      data: {
+        modulo: "seguridad",
+        accion: "eliminar_rol",
+        entidad: "Rol",
+        entidadId: id,
+        datoAnterior: JSON.stringify({ codigo: rol.codigo, nombre: rol.nombre, permisos: rol.permisos.length }),
+        motivo: "Eliminacion de rol sin usuarios asignados"
+      }
+    });
+  });
+
+  revalidatePath("/seguridad");
+  revalidatePath("/seguridad/roles");
+  revalidatePath("/seguridad/permisos");
+  revalidatePath("/seguridad/auditoria");
+}
+
 export async function savePermissionAction(formData: FormData) {
   const rolId = stringValue(formData, "rolId");
   const modulo = stringValue(formData, "modulo");
   const accion = stringValue(formData, "accion");
-  const campo = optionalStringValue(formData, "campo");
+  const campoValue = stringValue(formData, "campo");
+  const campo = campoValue.length > 0 ? campoValue : undefined;
   const permitido = stringValue(formData, "permitido") === "true";
 
   if (!rolId || !modulo || !accion) redirect("/seguridad/permisos?error=campos");
