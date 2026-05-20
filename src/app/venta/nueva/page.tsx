@@ -13,7 +13,22 @@ function toNumber(value: unknown): number {
   return 0;
 }
 
-export default async function NuevaVentaPage() {
+type NuevaVentaPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function NuevaVentaPage({ searchParams }: NuevaVentaPageProps) {
+  const params = searchParams ? await searchParams : {};
+  const resetKey = [
+    params.success,
+    params.pago,
+    params.vuelto,
+    params.error,
+  ]
+    .flat()
+    .filter(Boolean)
+    .join("-") || "nueva-venta";
+
   const sucursal = await prisma.sucursal.findFirst({
     orderBy: { createdAt: "asc" },
   });
@@ -75,6 +90,7 @@ export default async function NuevaVentaPage() {
         </div>
       ) : (
         <VentasNuevaClient
+          key={resetKey}
           productos={productosVenta}
           sucursalId={sucursal.id}
           sucursalNombre={sucursal.nombre}
