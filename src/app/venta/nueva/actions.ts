@@ -164,27 +164,39 @@ export async function guardarVentaAction(formData: FormData) {
           },
         });
 
-        if (!stock || Number(stock.stockActual) < linea.cantidad) {
-          throw new Error("Stock insuficiente para finalizar la venta.");
-        }
+        const stockAntes = stock ? Number(stock.stockActual) : 0;
+        const stockDespues = stockAntes - linea.cantidad;
 
-        await tx.inventarioStock.update({
-          where: { id: stock.id },
-          data: {
-            stockActual: Number(stock.stockActual) - linea.cantidad,
-          },
-        });
+        if (stock) {
+          await tx.inventarioStock.update({
+            where: { id: stock.id },
+            data: {
+              stockActual: stockDespues,
+            },
+          });
+        } else {
+          await tx.inventarioStock.create({
+            data: {
+              articuloId: linea.articuloId,
+              sucursalId,
+              stockActual: stockDespues,
+            },
+          });
+        }
 
         await tx.inventarioMovimiento.create({
           data: {
             articuloId: linea.articuloId,
             sucursalId,
-            tipoMovimiento: "salida_venta",
+            tipoMovimiento: stockAntes <= 0 ? "salida_venta_sin_stock" : "salida_venta",
             cantidad: linea.cantidad,
             documentoOrigenTipo: "BOLETA",
             documentoOrigenId: venta.id,
             usuarioId: user.id,
-            observacion: `Salida por venta ${folioDefinitivo}`,
+            observacion:
+              stockDespues < 0
+                ? `Salida por venta ${folioDefinitivo}. Stock quedó negativo (${stockDespues}).`
+                : `Salida por venta ${folioDefinitivo}`,
           },
         });
       }
