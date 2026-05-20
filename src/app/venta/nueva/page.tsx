@@ -80,10 +80,7 @@ export default async function NuevaVentaPage({ searchParams }: NuevaVentaPagePro
   });
 
   return (
-    <AppShell
-      title="Nueva venta"
-      subtitle="Venta temporal, productos, pagos múltiples y cierre de cobro"
-    >
+    <AppShell title="Nueva venta">
       {!sucursal ? (
         <div className="sagva-panel p-6 text-sm text-slate-600">
           No existe una sucursal configurada. Crea una sucursal antes de vender.
