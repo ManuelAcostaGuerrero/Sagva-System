@@ -36,7 +36,6 @@ type PagoVenta = {
   id: string;
   metodo: string;
   monto: number;
-  referencia: string;
 };
 
 type NuevaVentaClientProps = {
@@ -65,7 +64,6 @@ export function VentasNuevaClient({
   const [pagos, setPagos] = useState<PagoVenta[]>([]);
   const [metodoPago, setMetodoPago] = useState("EFECTIVO");
   const [montoPago, setMontoPago] = useState("");
-  const [referenciaPago, setReferenciaPago] = useState("");
   const [cliente, setCliente] = useState("");
   const [observacion, setObservacion] = useState("");
   const [quickMetodo, setQuickMetodo] = useState("");
@@ -129,7 +127,6 @@ export function VentasNuevaClient({
     pagos.map((pago) => ({
       metodo: pago.metodo,
       monto: pago.monto,
-      referencia: pago.referencia,
     })),
   );
 
@@ -245,7 +242,6 @@ export function VentasNuevaClient({
     setLineas([]);
     setPagos([]);
     setMontoPago("");
-    setReferenciaPago("");
     setCliente("");
     setObservacion("");
     setBusqueda("");
@@ -269,11 +265,9 @@ export function VentasNuevaClient({
         id: `pago-${Date.now()}`,
         metodo: metodoPago,
         monto,
-        referencia: referenciaPago,
       },
     ]);
     setMontoPago("");
-    setReferenciaPago("");
   }
 
   function eliminarPago(pagoId: string) {
@@ -627,16 +621,6 @@ export function VentasNuevaClient({
                     setMontoPago(String(Math.min(Math.max(value, 0), saldoPendiente)));
                   }}
                   placeholder={String(saldoPendiente || total || 0)}
-                  disabled={!puedeAgregarPago}
-                />
-              </div>
-              <div>
-                <label className="sagva-label">Referencia</label>
-                <input
-                  className="sagva-field"
-                  value={referenciaPago}
-                  onChange={(event) => setReferenciaPago(event.target.value)}
-                  placeholder="Código operación, voucher, nota"
                   disabled={!puedeAgregarPago}
                 />
               </div>
