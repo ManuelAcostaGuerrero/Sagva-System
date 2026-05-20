@@ -107,6 +107,7 @@ export function VentasNuevaClient({
 
   const saldoPendiente = Math.max(total - totalPagado, 0);
   const vuelto = Math.max(totalPagado - total, 0);
+  const puedeAgregarPago = lineas.length > 0 && total > 0 && saldoPendiente > 0;
   const lineasPayload = JSON.stringify(
     lineas.map((linea) => ({
       articuloId: linea.articuloId,
@@ -199,8 +200,12 @@ export function VentasNuevaClient({
   }
 
   function agregarPago() {
-    const monto = Number(montoPago || saldoPendiente);
-    if (!metodoPago || !Number.isFinite(monto) || monto <= 0) return;
+    if (!puedeAgregarPago) return;
+
+    const montoSolicitado = Number(montoPago || saldoPendiente);
+    if (!metodoPago || !Number.isFinite(montoSolicitado) || montoSolicitado <= 0) return;
+
+    const monto = Math.min(montoSolicitado, saldoPendiente);
 
     setPagos((current) => [
       ...current,
@@ -221,7 +226,7 @@ export function VentasNuevaClient({
 
   function seleccionarMetodoPago(metodo: string) {
     setMetodoPago(metodo);
-    setMontoPago(String(saldoPendiente || total || 0));
+    setMontoPago(saldoPendiente > 0 ? String(saldoPendiente) : "");
   }
 
   return (
@@ -429,7 +434,8 @@ export function VentasNuevaClient({
                 key={metodo}
                 type="button"
                 onClick={() => seleccionarMetodoPago(metodo)}
-                className={`rounded-md border px-3 py-2 text-sm font-bold ${
+                disabled={!puedeAgregarPago}
+                className={`rounded-md border px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50 ${
                   metodoPago === metodo
                     ? "border-[#064ea4] bg-blue-50 text-[#064ea4]"
                     : "border-[#d8dee8] bg-white text-slate-700"
@@ -446,9 +452,19 @@ export function VentasNuevaClient({
               <input
                 className="sagva-field"
                 type="number"
+                min={0}
+                max={saldoPendiente}
                 value={montoPago}
-                onChange={(event) => setMontoPago(event.target.value)}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  if (!Number.isFinite(value)) {
+                    setMontoPago("");
+                    return;
+                  }
+                  setMontoPago(String(Math.min(Math.max(value, 0), saldoPendiente)));
+                }}
                 placeholder={String(saldoPendiente || total || 0)}
+                disabled={!puedeAgregarPago}
               />
             </div>
             <div>
@@ -458,16 +474,22 @@ export function VentasNuevaClient({
                 value={referenciaPago}
                 onChange={(event) => setReferenciaPago(event.target.value)}
                 placeholder="Código operación, voucher, nota"
+                disabled={!puedeAgregarPago}
               />
             </div>
             <button
               type="button"
               onClick={agregarPago}
-              disabled={!lineas.length || total <= 0}
+              disabled={!puedeAgregarPago}
               className="w-full sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Agregar pago
+              {saldoPendiente > 0 ? "Agregar pago" : "Pago completo"}
             </button>
+            {lineas.length > 0 && saldoPendiente === 0 ? (
+              <p className="rounded-md bg-green-50 px-3 py-2 text-xs font-semibold text-green-700">
+                El total ya está cubierto. Elimina un pago si necesitas cambiar el método o monto.
+              </p>
+            ) : null}
           </div>
 
           <div className="mt-4 space-y-2">
