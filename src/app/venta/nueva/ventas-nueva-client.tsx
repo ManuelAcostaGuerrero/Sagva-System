@@ -53,6 +53,11 @@ type VentaTemporal = {
   montoPago: string;
 };
 
+type DialogoDescuento = {
+  articuloId: string;
+  nombreArticulo: string;
+};
+
 type NuevaVentaClientProps = {
   productos: ProductoVenta[];
   cajaActiva: CajaActiva;
@@ -61,6 +66,9 @@ type NuevaVentaClientProps = {
 };
 
 const metodosPago = ["EFECTIVO", "DEBITO", "CREDITO", "TRANSFERENCIA"];
+const DESCUENTOS_REQUIEREN_AUTORIZACION = true;
+const PIN_DESCUENTO_TEMPORAL = ["12", "34"].join("");
+const MAX_DESCUENTO_PORCENTAJE_TEMPORAL = 100;
 
 function money(value: number) {
   return formatCurrency(Number.isFinite(value) ? value : 0);
@@ -90,7 +98,8 @@ function totalPagadoVenta(pagos: PagoVenta[]) {
 function calcularDescuento(linea: Pick<LineaVenta, "cantidad" | "precioUnitario" | "descuentoTipo" | "descuentoValor">) {
   const bruto = Math.max(linea.cantidad * linea.precioUnitario, 0);
   const valor = Math.max(Number(linea.descuentoValor) || 0, 0);
-  const descuento = linea.descuentoTipo === "porcentaje" ? bruto * (Math.min(valor, 100) / 100) : valor;
+  const porcentaje = Math.min(valor, MAX_DESCUENTO_PORCENTAJE_TEMPORAL);
+  const descuento = linea.descuentoTipo === "porcentaje" ? bruto * (porcentaje / 100) : valor;
   return Math.min(descuento, bruto);
 }
 
@@ -111,6 +120,8 @@ export function VentasNuevaClient({
 }: NuevaVentaClientProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const efectivoInputRef = useRef<HTMLInputElement>(null);
+  const pinDescuentoInputRef = useRef<HTMLInputElement>(null);
+  const descuentoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const primeraVentaRef = useRef(crearVentaTemporal(1));
   const [busqueda, setBusqueda] = useState("");
   const [ventas, setVentas] = useState<VentaTemporal[]>(() => [primeraVentaRef.current]);
@@ -118,6 +129,10 @@ export function VentasNuevaClient({
   const [quickMetodo, setQuickMetodo] = useState("");
   const [efectivoRecibido, setEfectivoRecibido] = useState("");
   const [dialogoEfectivoAbierto, setDialogoEfectivoAbierto] = useState(false);
+  const [dialogoDescuento, setDialogoDescuento] = useState<DialogoDescuento | null>(null);
+  const [pinDescuento, setPinDescuento] = useState("");
+  const [errorPinDescuento, setErrorPinDescuento] = useState("");
+  const [descuentosAutorizados, setDescuentosAutorizados] = useState<Record<string, boolean>>({});
   const [bannerVuelto, setBannerVuelto] = useState<{ pago: number; vuelto: number } | null>(null);
 
   const ventaActiva = ventas.find((venta) => venta.id === ventaActivaId) ?? ventas[0];
@@ -207,6 +222,11 @@ export function VentasNuevaClient({
   }, [dialogoEfectivoAbierto]);
 
   useEffect(() => {
+    if (!dialogoDescuento) return;
+    setTimeout(() => pinDescuentoInputRef.current?.focus(), 50);
+  }, [dialogoDescuento]);
+
+  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.ctrlKey || event.altKey || event.metaKey) return;
       if (!["F2", "F6", "F8", "F10"].includes(event.key)) return;
@@ -237,6 +257,7 @@ export function VentasNuevaClient({
     setQuickMetodo("");
     setEfectivoRecibido("");
     setDialogoEfectivoAbierto(false);
+    setDialogoDescuento(null);
   }
 
   function cerrarVentaTemporal(id: string) {
@@ -301,6 +322,39 @@ export function VentasNuevaClient({
     }));
   }
 
+  function descuentoEstaAutorizado(articuloId: string) {
+    return !DESCUENTOS_REQUIEREN_AUTORIZACION || descuentosAutorizados[articuloId];
+  }
+
+  function solicitarAutorizacionDescuento(linea: LineaVenta) {
+    if (descuentoEstaAutorizado(linea.articuloId)) return true;
+
+    setDialogoDescuento({ articuloId: linea.articuloId, nombreArticulo: linea.nombreArticulo });
+    setPinDescuento("");
+    setErrorPinDescuento("");
+    return false;
+  }
+
+  function confirmarAutorizacionDescuento() {
+    if (!dialogoDescuento) return;
+
+    if (pinDescuento !== PIN_DESCUENTO_TEMPORAL) {
+      setErrorPinDescuento("PIN incorrecto.");
+      return;
+    }
+
+    const articuloId = dialogoDescuento.articuloId;
+    setDescuentosAutorizados((current) => ({ ...current, [articuloId]: true }));
+    setDialogoDescuento(null);
+    setPinDescuento("");
+    setErrorPinDescuento("");
+    setTimeout(() => {
+      const input = descuentoInputRefs.current[articuloId];
+      input?.focus();
+      input?.select();
+    }, 50);
+  }
+
   function cambiarTipoDescuento(articuloId: string, descuentoTipo: TipoDescuento) {
     actualizarVentaActiva((venta) => ({
       ...venta,
@@ -316,7 +370,10 @@ export function VentasNuevaClient({
       ...venta,
       lineas: venta.lineas.map((linea) => {
         if (linea.articuloId !== articuloId) return linea;
-        return recalcularLinea({ ...linea, descuentoValor: Math.max(descuentoValor, 0) });
+        const valorLimitado = linea.descuentoTipo === "porcentaje"
+          ? Math.min(Math.max(descuentoValor, 0), MAX_DESCUENTO_PORCENTAJE_TEMPORAL)
+          : Math.max(descuentoValor, 0);
+        return recalcularLinea({ ...linea, descuentoValor: valorLimitado });
       }),
     }));
   }
@@ -326,6 +383,11 @@ export function VentasNuevaClient({
       ...venta,
       lineas: venta.lineas.filter((linea) => linea.articuloId !== articuloId),
     }));
+    setDescuentosAutorizados((current) => {
+      const next = { ...current };
+      delete next[articuloId];
+      return next;
+    });
   }
 
   function limpiarVenta() {
@@ -342,6 +404,8 @@ export function VentasNuevaClient({
     setQuickMetodo("");
     setEfectivoRecibido("");
     setDialogoEfectivoAbierto(false);
+    setDialogoDescuento(null);
+    setDescuentosAutorizados({});
     setBannerVuelto(null);
   }
 
@@ -583,6 +647,7 @@ export function VentasNuevaClient({
                 <tbody>
                   {lineas.map((linea) => {
                     const sinStock = linea.stockDisponible <= 0;
+                    const descuentoAutorizado = descuentoEstaAutorizado(linea.articuloId);
                     return (
                       <tr key={linea.articuloId} className={sinStock ? "bg-amber-50" : undefined}>
                         <td>
@@ -615,26 +680,55 @@ export function VentasNuevaClient({
                             <select
                               className="sagva-field w-24"
                               value={linea.descuentoTipo}
-                              onChange={(event) =>
-                                cambiarTipoDescuento(linea.articuloId, event.target.value as TipoDescuento)
-                              }
+                              onMouseDown={(event) => {
+                                if (!descuentoAutorizado) {
+                                  event.preventDefault();
+                                  solicitarAutorizacionDescuento(linea);
+                                }
+                              }}
+                              onChange={(event) => {
+                                if (!descuentoAutorizado) return;
+                                cambiarTipoDescuento(linea.articuloId, event.target.value as TipoDescuento);
+                              }}
                             >
                               <option value="monto">Monto</option>
                               <option value="porcentaje">%</option>
                             </select>
                             <input
+                              ref={(node) => {
+                                descuentoInputRefs.current[linea.articuloId] = node;
+                              }}
                               className="sagva-field w-24"
                               type="number"
                               min={0}
-                              max={linea.descuentoTipo === "porcentaje" ? 100 : undefined}
+                              max={linea.descuentoTipo === "porcentaje" ? MAX_DESCUENTO_PORCENTAJE_TEMPORAL : undefined}
                               value={linea.descuentoValor}
-                              onFocus={(event) => event.currentTarget.select()}
-                              onClick={(event) => event.currentTarget.select()}
-                              onChange={(event) =>
-                                cambiarDescuento(linea.articuloId, Number(event.target.value))
-                              }
+                              readOnly={!descuentoAutorizado}
+                              onFocus={(event) => {
+                                if (!descuentoAutorizado) {
+                                  event.currentTarget.blur();
+                                  solicitarAutorizacionDescuento(linea);
+                                  return;
+                                }
+                                event.currentTarget.select();
+                              }}
+                              onClick={(event) => {
+                                if (!descuentoAutorizado) {
+                                  event.currentTarget.blur();
+                                  solicitarAutorizacionDescuento(linea);
+                                  return;
+                                }
+                                event.currentTarget.select();
+                              }}
+                              onChange={(event) => {
+                                if (!descuentoAutorizado) return;
+                                cambiarDescuento(linea.articuloId, Number(event.target.value));
+                              }}
                             />
                           </div>
+                          {!descuentoAutorizado ? (
+                            <p className="mt-1 text-xs text-amber-700">Requiere autorización</p>
+                          ) : null}
                           {linea.descuento > 0 ? (
                             <p className="mt-1 text-xs text-slate-500">-{money(linea.descuento)}</p>
                           ) : null}
@@ -924,6 +1018,67 @@ export function VentasNuevaClient({
                 className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {dialogoDescuento ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-950">Autorizar descuento</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Para aplicar descuento a {dialogoDescuento.nombreArticulo}, ingresa el PIN autorizado.
+            </p>
+            <label className="sagva-label mt-4">PIN</label>
+            <input
+              ref={pinDescuentoInputRef}
+              className="sagva-field"
+              type="tel"
+              value={pinDescuento}
+              onChange={(event) => {
+                setPinDescuento(event.target.value);
+                setErrorPinDescuento("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  confirmarAutorizacionDescuento();
+                }
+                if (event.key === "Escape") {
+                  setDialogoDescuento(null);
+                  setPinDescuento("");
+                  setErrorPinDescuento("");
+                }
+              }}
+            />
+            {errorPinDescuento ? (
+              <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                {errorPinDescuento}
+              </p>
+            ) : null}
+            <p className="mt-3 text-xs text-slate-500">
+              Esta autorización es temporal. Luego debe venir desde el módulo de Seguridad.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDialogoDescuento(null);
+                  setPinDescuento("");
+                  setErrorPinDescuento("");
+                }}
+                className="sagva-button-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarAutorizacionDescuento}
+                className="sagva-button-primary"
+              >
+                Autorizar
               </button>
             </div>
           </div>
