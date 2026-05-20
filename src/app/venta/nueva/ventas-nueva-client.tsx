@@ -108,6 +108,7 @@ export function VentasNuevaClient({
   const saldoPendiente = Math.max(total - totalPagado, 0);
   const vuelto = Math.max(totalPagado - total, 0);
   const puedeAgregarPago = lineas.length > 0 && total > 0 && saldoPendiente > 0;
+
   const lineasPayload = JSON.stringify(
     lineas.map((linea) => ({
       articuloId: linea.articuloId,
@@ -116,6 +117,7 @@ export function VentasNuevaClient({
       descuento: linea.descuento,
     })),
   );
+
   const pagosPayload = JSON.stringify(
     pagos.map((pago) => ({
       metodo: pago.metodo,
@@ -285,27 +287,43 @@ export function VentasNuevaClient({
 
               {busqueda.trim() ? (
                 <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-80 overflow-y-auto rounded-lg border border-[#d8dee8] bg-white shadow-lg">
-                  {productosFiltrados.map((producto) => (
-                    <button
-                      key={producto.articuloId}
-                      type="button"
-                      onClick={() => agregarProducto(producto)}
-                      className="flex w-full items-center justify-between gap-4 border-b border-[#eef2f7] px-4 py-3 text-left last:border-b-0 hover:bg-blue-50"
-                    >
-                      <div>
-                        <p className="font-bold text-slate-950">{producto.nombreArticulo}</p>
-                        <p className="text-xs text-slate-500">
-                          Código: {producto.codigoProducto}
-                          {producto.codigoBarra ? ` · Barra: ${producto.codigoBarra}` : ""}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-[#064ea4]">{money(producto.precioPublico)}</p>
-                        <p className="text-xs font-semibold text-slate-500">Stock {producto.stockDisponible}</p>
-                      </div>
-                      <Plus className="h-4 w-4 shrink-0 text-[#064ea4]" aria-hidden="true" />
-                    </button>
-                  ))}
+                  {productosFiltrados.map((producto) => {
+                    const sinStock = producto.stockDisponible <= 0;
+                    return (
+                      <button
+                        key={producto.articuloId}
+                        type="button"
+                        onClick={() => agregarProducto(producto)}
+                        className={`flex w-full items-center justify-between gap-4 border-b px-4 py-3 text-left last:border-b-0 ${
+                          sinStock
+                            ? "border-amber-200 bg-amber-50 hover:bg-amber-100"
+                            : "border-[#eef2f7] hover:bg-blue-50"
+                        }`}
+                      >
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-bold text-slate-950">{producto.nombreArticulo}</p>
+                            {sinStock ? (
+                              <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                                Sin stock
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            Código: {producto.codigoProducto}
+                            {producto.codigoBarra ? ` · Barra: ${producto.codigoBarra}` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-[#064ea4]">{money(producto.precioPublico)}</p>
+                          <p className={`text-xs font-semibold ${sinStock ? "text-amber-800" : "text-slate-500"}`}>
+                            Stock {producto.stockDisponible}
+                          </p>
+                        </div>
+                        <Plus className="h-4 w-4 shrink-0 text-[#064ea4]" aria-hidden="true" />
+                      </button>
+                    );
+                  })}
 
                   {productosFiltrados.length === 0 ? (
                     <div className="px-4 py-5 text-sm text-slate-500">
@@ -316,7 +334,7 @@ export function VentasNuevaClient({
               ) : null}
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Los productos solo aparecen cuando escribes. Al seleccionar uno, se agrega al detalle de venta.
+              Los productos sin stock se muestran en amarillo. Se pueden vender, pero quedarán con stock negativo.
             </p>
           </div>
         </div>
@@ -336,48 +354,58 @@ export function VentasNuevaClient({
                 </tr>
               </thead>
               <tbody>
-                {lineas.map((linea) => (
-                  <tr key={linea.articuloId}>
-                    <td>
-                      <p className="font-bold text-slate-950">{linea.nombreArticulo}</p>
-                      <p className="text-xs text-slate-500">{linea.codigoProducto}</p>
-                    </td>
-                    <td>
-                      <input
-                        className="sagva-field w-20"
-                        type="number"
-                        min={1}
-                        value={linea.cantidad}
-                        onChange={(event) =>
-                          cambiarCantidad(linea.articuloId, Number(event.target.value))
-                        }
-                      />
-                    </td>
-                    <td>{money(linea.precioUnitario)}</td>
-                    <td>
-                      <input
-                        className="sagva-field w-28"
-                        type="number"
-                        min={0}
-                        value={linea.descuento}
-                        onChange={(event) =>
-                          cambiarDescuento(linea.articuloId, Number(event.target.value))
-                        }
-                      />
-                    </td>
-                    <td className="font-bold text-slate-950">{money(linea.totalLinea)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => eliminarLinea(linea.articuloId)}
-                        className="rounded-md p-2 text-red-600 hover:bg-red-50"
-                        title="Eliminar producto"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {lineas.map((linea) => {
+                  const sinStock = linea.stockDisponible <= 0;
+                  return (
+                    <tr key={linea.articuloId} className={sinStock ? "bg-amber-50" : undefined}>
+                      <td>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-bold text-slate-950">{linea.nombreArticulo}</p>
+                          {sinStock ? (
+                            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                              Venta sin stock
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-slate-500">{linea.codigoProducto}</p>
+                      </td>
+                      <td>
+                        <input
+                          className="sagva-field w-20"
+                          type="number"
+                          min={1}
+                          value={linea.cantidad}
+                          onChange={(event) =>
+                            cambiarCantidad(linea.articuloId, Number(event.target.value))
+                          }
+                        />
+                      </td>
+                      <td>{money(linea.precioUnitario)}</td>
+                      <td>
+                        <input
+                          className="sagva-field w-28"
+                          type="number"
+                          min={0}
+                          value={linea.descuento}
+                          onChange={(event) =>
+                            cambiarDescuento(linea.articuloId, Number(event.target.value))
+                          }
+                        />
+                      </td>
+                      <td className="font-bold text-slate-950">{money(linea.totalLinea)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => eliminarLinea(linea.articuloId)}
+                          className="rounded-md p-2 text-red-600 hover:bg-red-50"
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {lineas.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-slate-500">
