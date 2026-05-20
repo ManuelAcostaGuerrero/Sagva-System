@@ -135,12 +135,23 @@ export function VentasNuevaClient({
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const pago = Number(params.get("pago") ?? "");
-    const vueltoParam = Number(params.get("vuelto") ?? "");
+    const pagoRaw = params.get("pago");
+    const vueltoRaw = params.get("vuelto");
+
+    if (!pagoRaw || !vueltoRaw) {
+      setBannerVuelto(null);
+      return;
+    }
+
+    const pago = Number(pagoRaw);
+    const vueltoParam = Number(vueltoRaw);
 
     if (params.get("success") === "cobrada" && Number.isFinite(pago) && Number.isFinite(vueltoParam)) {
       setBannerVuelto({ pago, vuelto: vueltoParam });
+      return;
     }
+
+    setBannerVuelto(null);
   }, []);
 
   useEffect(() => {
@@ -276,6 +287,7 @@ export function VentasNuevaClient({
 
   function iniciarCobroRapido(metodo: string) {
     if (!puedeCobroRapido) return;
+    setBannerVuelto(null);
 
     if (metodo === "efectivo") {
       setQuickMetodo("efectivo");
