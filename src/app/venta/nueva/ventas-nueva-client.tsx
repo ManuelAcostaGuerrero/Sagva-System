@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CreditCard, Plus, Search, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
+import { guardarVentaAction } from "./actions";
 
 type ProductoVenta = {
   articuloId: string;
@@ -41,6 +42,7 @@ type PagoVenta = {
 type NuevaVentaClientProps = {
   productos: ProductoVenta[];
   cajaActiva: CajaActiva;
+  sucursalId: string;
   sucursalNombre: string;
 };
 
@@ -53,6 +55,7 @@ function money(value: number) {
 export function VentasNuevaClient({
   productos,
   cajaActiva,
+  sucursalId,
   sucursalNombre,
 }: NuevaVentaClientProps) {
   const [busqueda, setBusqueda] = useState("");
@@ -104,6 +107,21 @@ export function VentasNuevaClient({
 
   const saldoPendiente = Math.max(total - totalPagado, 0);
   const vuelto = Math.max(totalPagado - total, 0);
+  const lineasPayload = JSON.stringify(
+    lineas.map((linea) => ({
+      articuloId: linea.articuloId,
+      cantidad: linea.cantidad,
+      precioUnitario: linea.precioUnitario,
+      descuento: linea.descuento,
+    })),
+  );
+  const pagosPayload = JSON.stringify(
+    pagos.map((pago) => ({
+      metodo: pago.metodo,
+      monto: pago.monto,
+      referencia: pago.referencia,
+    })),
+  );
 
   function agregarProducto(producto: ProductoVenta) {
     setLineas((current) => {
@@ -169,6 +187,15 @@ export function VentasNuevaClient({
     setLineas((current) => current.filter((linea) => linea.articuloId !== articuloId));
   }
 
+  function limpiarVenta() {
+    setLineas([]);
+    setPagos([]);
+    setMontoPago("");
+    setReferenciaPago("");
+    setCliente("");
+    setObservacion("");
+  }
+
   function agregarPago() {
     const monto = Number(montoPago || saldoPendiente);
     if (!metodoPago || !Number.isFinite(monto) || monto <= 0) return;
@@ -186,13 +213,24 @@ export function VentasNuevaClient({
     setReferenciaPago("");
   }
 
+  function eliminarPago(pagoId: string) {
+    setPagos((current) => current.filter((pago) => pago.id !== pagoId));
+  }
+
   function seleccionarMetodoPago(metodo: string) {
     setMetodoPago(metodo);
     setMontoPago(String(saldoPendiente || total || 0));
   }
 
   return (
-    <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
+    <form action={guardarVentaAction} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
+      <input type="hidden" name="sucursalId" value={sucursalId} />
+      <input type="hidden" name="cajaId" value={cajaActiva?.id ?? ""} />
+      <input type="hidden" name="cliente" value={cliente} />
+      <input type="hidden" name="observacion" value={observacion} />
+      <input type="hidden" name="lineas" value={lineasPayload} />
+      <input type="hidden" name="pagos" value={pagosPayload} />
+
       <div className="space-y-5">
         <div className="sagva-panel p-5">
           <div className="grid gap-4 md:grid-cols-3">
@@ -431,7 +469,17 @@ export function VentasNuevaClient({
                 className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-sm"
               >
                 <span className="font-bold">{pago.metodo}</span>
-                <span>{money(pago.monto)}</span>
+                <div className="flex items-center gap-2">
+                  <span>{money(pago.monto)}</span>
+                  <button
+                    type="button"
+                    onClick={() => eliminarPago(pago.id)}
+                    className="rounded p-1 text-red-600 hover:bg-red-50"
+                    title="Eliminar pago"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
             ))}
             {pagos.length === 0 ? (
@@ -454,20 +502,32 @@ export function VentasNuevaClient({
 
         <div className="grid gap-3">
           <button
-            type="button"
+            type="submit"
+            name="accion"
+            value="cobrar"
             disabled={!lineas.length || saldoPendiente > 0 || !cajaActiva}
             className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             Cobrar venta
           </button>
-          <button type="button" className="sagva-button-secondary">
+          <button
+            type="submit"
+            name="accion"
+            value="pendiente"
+            disabled={!lineas.length}
+            className="sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Guardar pendiente
           </button>
-          <button type="button" className="rounded-md border border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-50">
+          <button
+            type="button"
+            onClick={limpiarVenta}
+            className="rounded-md border border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-50"
+          >
             Anular pestaña
           </button>
         </div>
       </aside>
-    </section>
+    </form>
   );
 }
