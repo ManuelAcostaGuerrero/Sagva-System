@@ -1,10 +1,58 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { SecurityNav } from "@/components/security/security-nav";
+import { PermissionForm } from "./permission-form";
+import { prisma } from "@/lib/prisma";
 
-export default function SeguridadPermisosPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SeguridadPermisosPage() {
+  const [roles, permisos] = await Promise.all([
+    prisma.rol.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.permiso.findMany({ include: { rol: true }, orderBy: [{ modulo: "asc" }, { accion: "asc" }, { campo: "asc" }] })
+  ]);
+
   return (
-    <AppShell>
-      <h2 className="text-2xl font-semibold text-ink">Permisos</h2>
-      <p className="mt-2 text-sm text-slate-600">Base para permisos por módulo, acción y campo.</p>
+    <AppShell title="Permisos" subtitle="Matriz de permisos por rol, modulo, campo y accion">
+      <section className="space-y-6">
+        <SecurityNav />
+
+        <PermissionForm
+          roles={roles.map((rol) => ({ id: rol.id, nombre: rol.nombre }))}
+          existingPermissions={permisos.map((permiso) => ({
+            rolId: permiso.rolId,
+            modulo: permiso.modulo,
+            accion: permiso.accion,
+            campo: permiso.campo,
+            permitido: permiso.permitido
+          }))}
+        />
+
+        <div className="sagva-panel overflow-hidden">
+          <div className="border-b border-[#d8dee8] p-5">
+            <h2 className="text-lg font-bold text-slate-950">Resumen de permisos guardados</h2>
+            <p className="mt-1 text-sm text-slate-500">Vista de control de las reglas existentes en la base de datos.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr><th className="px-4 py-3">Rol</th><th className="px-4 py-3">Modulo</th><th className="px-4 py-3">Accion</th><th className="px-4 py-3">Campo</th><th className="px-4 py-3">Estado</th></tr>
+              </thead>
+              <tbody className="divide-y divide-[#edf1f7]">
+                {permisos.slice(0, 120).map((permiso) => (
+                  <tr key={permiso.id} className="bg-white">
+                    <td className="px-4 py-3 font-semibold text-slate-900">{permiso.rol.nombre}</td>
+                    <td className="px-4 py-3 text-slate-600">{permiso.modulo}</td>
+                    <td className="px-4 py-3 text-slate-600">{permiso.accion}</td>
+                    <td className="px-4 py-3 text-slate-600">{permiso.campo ?? "Todo el modulo"}</td>
+                    <td className="px-4 py-3"><span className={permiso.permitido ? "rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700" : "rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700"}>{permiso.permitido ? "Permitido" : "Bloqueado"}</span></td>
+                  </tr>
+                ))}
+                {permisos.length === 0 ? <tr><td colSpan={5} className="py-8 text-center text-slate-500">No hay permisos configurados.</td></tr> : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </AppShell>
   );
 }

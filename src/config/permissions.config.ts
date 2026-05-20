@@ -1,27 +1,260 @@
 export const initialRoles = [
-  {
-    code: "admin",
-    name: "Administrador",
-    description: "Acceso completo para configuración, operación y auditoría."
-  },
-  {
-    code: "supervisor",
-    name: "Supervisor",
-    description: "Gestiona operación diaria y revisa cierres, ventas e inventario."
-  },
-  {
-    code: "cajero",
-    name: "Cajero",
-    description: "Opera ventas, pagos y caja según permisos visibles."
-  }
+  { code: "admin", name: "Administrador", description: "Acceso completo para configuracion, operacion, auditoria y seguridad." },
+  { code: "encargado", name: "Encargado", description: "Gestiona operacion diaria, ventas, caja, inventario y autorizaciones limitadas." },
+  { code: "vendedor", name: "Vendedor", description: "Opera ventas, consulta productos y registra pagos segun permisos." },
+  { code: "bodega", name: "Bodega", description: "Gestiona inventario, movimientos de stock y apoyo operativo." },
+  { code: "produccion", name: "Produccion", description: "Opera ensamblaje, recetas, consumos y solicitudes internas." },
+  { code: "contabilidad", name: "Contabilidad", description: "Consulta facturas, impuestos, reportes y documentos comerciales." }
 ] as const;
 
+export const securityModules = [
+  "dashboard",
+  "articulos",
+  "inventario",
+  "proveedores",
+  "facturas",
+  "venta",
+  "caja",
+  "ensamblaje",
+  "analisis",
+  "seguridad",
+  "calendario",
+  "configuracion"
+] as const;
+
+export const permissionActions = ["ver", "crear", "editar", "eliminar", "anular", "exportar", "autorizar"] as const;
+
+export const moduleSensitiveFields = {
+  dashboard: [
+    "resumen_ventas",
+    "ventas_periodo",
+    "comparativo_periodos",
+    "stock_critico",
+    "utilidad_estimada",
+    "exportar_dashboard"
+  ],
+  articulos: [
+    "codigo_producto",
+    "codigo_inventario",
+    "codigo_barra",
+    "nombre",
+    "familia",
+    "subfamilia",
+    "marca",
+    "unidad_medida",
+    "cantidad_especifica",
+    "tipo_impuesto",
+    "impuesto_adicional",
+    "stock_minimo",
+    "stock_maximo",
+    "comentario",
+    "estado",
+    "precio_con_iva",
+    "precio_sin_iva",
+    "margen_ganancia",
+    "precio_publico",
+    "precio_mayorista",
+    "cantidad_minima_mayorista"
+  ],
+  inventario: [
+    "stock_actual",
+    "stock_minimo",
+    "stock_maximo",
+    "tipo_movimiento",
+    "cantidad_movimiento",
+    "documento_origen",
+    "observacion_movimiento",
+    "ajuste_manual",
+    "entrada_stock",
+    "salida_stock",
+    "alerta_stock_critico"
+  ],
+  proveedores: [
+    "codigo_proveedor",
+    "rut_ruc",
+    "razon_social",
+    "nombre_comercial",
+    "direccion",
+    "contacto",
+    "telefono",
+    "correo",
+    "condiciones_comerciales",
+    "estado_proveedor",
+    "lista_precios_pdf",
+    "lista_precios_excel_csv_sheets",
+    "asociacion_producto_proveedor",
+    "codigo_producto_proveedor",
+    "nombre_producto_proveedor"
+  ],
+  facturas: [
+    "numero_factura",
+    "proveedor",
+    "fecha_emision",
+    "fecha_recepcion",
+    "estado_factura",
+    "observacion_factura",
+    "producto_facturado",
+    "codigo_producto_proveedor",
+    "articulo_asociado",
+    "cantidad",
+    "precio_acordado",
+    "precio_facturado",
+    "impuesto",
+    "total_linea",
+    "diferencia_factura",
+    "nota_credito_pendiente",
+    "anulacion_factura"
+  ],
+  venta: [
+    "id_temporal",
+    "folio_definitivo",
+    "vendedor",
+    "cliente",
+    "sucursal",
+    "caja",
+    "busqueda_producto",
+    "agregar_producto",
+    "eliminar_producto",
+    "cantidad_producto",
+    "precio_unitario",
+    "descuento_tipo",
+    "descuento_valor",
+    "descuento_total",
+    "pin_descuento",
+    "autorizar_descuento",
+    "subtotal",
+    "total_venta",
+    "metodo_pago",
+    "monto_pago",
+    "agregar_pago",
+    "eliminar_pago",
+    "total_pagado",
+    "saldo_pendiente",
+    "vuelto",
+    "cobro_rapido",
+    "efectivo_recibido",
+    "observacion_venta",
+    "guardar_pendiente",
+    "cobrar_venta",
+    "anular_venta",
+    "ventas_abiertas",
+    "cerrar_venta_temporal"
+  ],
+  caja: [
+    "monto_inicial",
+    "abrir_caja",
+    "estado_caja",
+    "fecha_apertura",
+    "fecha_cierre",
+    "ingreso_caja",
+    "retiro_caja",
+    "concepto_movimiento",
+    "monto_movimiento",
+    "observacion_movimiento",
+    "ventas_turno",
+    "total_movimientos_caja",
+    "efectivo_esperado",
+    "efectivo_contado",
+    "diferencia_caja",
+    "observacion_cierre",
+    "cerrar_caja",
+    "historial_cajas",
+    "correccion_apertura_cierre"
+  ],
+  ensamblaje: [
+    "producto_final",
+    "nombre_ensamblaje",
+    "estado_ensamblaje",
+    "costo_estimado",
+    "observacion_ensamblaje",
+    "componente",
+    "cantidad_requerida",
+    "costo_componente",
+    "tipo_movimiento_ensamblaje",
+    "cantidad_movimiento_ensamblaje",
+    "motivo_movimiento",
+    "merma",
+    "autorizar_merma",
+    "receta_base",
+    "cerrar_ensamblaje"
+  ],
+  analisis: [
+    "ventas_periodo",
+    "comparacion_tres_periodos",
+    "utilidad",
+    "margen",
+    "costo",
+    "stock_critico",
+    "proyeccion_ventas",
+    "alertas_gestion",
+    "exportar_reportes",
+    "filtros_reporte"
+  ],
+  seguridad: [
+    "usuarios",
+    "roles",
+    "permisos",
+    "auditoria",
+    "autorizaciones",
+    "cambiar_rol",
+    "bloquear_usuario",
+    "estado_usuario",
+    "ver_dato_anterior",
+    "ver_dato_nuevo",
+    "aprobar_autorizacion",
+    "rechazar_autorizacion"
+  ],
+  calendario: [
+    "fecha",
+    "nombre_fecha",
+    "tipo_fecha",
+    "impacto_esperado",
+    "observacion_fecha",
+    "feriado_irrenunciable",
+    "feriado_laboral",
+    "dia_conmemorativo"
+  ],
+  configuracion: [
+    "interfaz",
+    "parametros_generales",
+    "integraciones",
+    "datos_empresa",
+    "preferencias_sistema"
+  ]
+} as const;
+
+export const protectedFields = Object.values(moduleSensitiveFields).flat();
+
 export const criticalActions = [
-  "venta.anular",
-  "caja.cerrar",
-  "caja.corregir",
-  "inventario.ajustar",
-  "articulos.editar_precio",
-  "facturas.procesar",
-  "seguridad.asignar_permiso"
+  "articulos.precio_costo",
+  "articulos.margen_ganancia",
+  "inventario.ajuste_manual",
+  "venta.anulacion",
+  "venta.descuento_especial",
+  "facturas.anulacion",
+  "caja.diferencia",
+  "caja.correccion",
+  "caja.ver_totales_turno",
+  "ensamblaje.merma",
+  "ensamblaje.receta_base",
+  "seguridad.permisos"
+] as const;
+
+export const basePermissions = [
+  { role: "admin", modulo: "seguridad", accion: "autorizar", campo: null, permitido: true },
+  { role: "admin", modulo: "seguridad", accion: "editar", campo: null, permitido: true },
+  { role: "encargado", modulo: "dashboard", accion: "ver", campo: null, permitido: true },
+  { role: "encargado", modulo: "venta", accion: "ver", campo: null, permitido: true },
+  { role: "encargado", modulo: "caja", accion: "autorizar", campo: "diferencia_caja", permitido: true },
+  { role: "encargado", modulo: "caja", accion: "ver", campo: "ventas_turno", permitido: true },
+  { role: "vendedor", modulo: "venta", accion: "crear", campo: null, permitido: true },
+  { role: "vendedor", modulo: "articulos", accion: "ver", campo: "precio_publico", permitido: true },
+  { role: "vendedor", modulo: "articulos", accion: "ver", campo: "precio_costo", permitido: false },
+  { role: "vendedor", modulo: "caja", accion: "ver", campo: "efectivo_esperado", permitido: false },
+  { role: "vendedor", modulo: "caja", accion: "ver", campo: "diferencia_caja", permitido: false },
+  { role: "bodega", modulo: "inventario", accion: "crear", campo: null, permitido: true },
+  { role: "produccion", modulo: "ensamblaje", accion: "crear", campo: null, permitido: true },
+  { role: "produccion", modulo: "ensamblaje", accion: "autorizar", campo: "merma", permitido: false },
+  { role: "contabilidad", modulo: "facturas", accion: "ver", campo: null, permitido: true },
+  { role: "contabilidad", modulo: "analisis", accion: "exportar", campo: null, permitido: true }
 ] as const;
