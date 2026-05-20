@@ -76,6 +76,7 @@ export default async function NuevaVentaPage() {
       ) : (
         <VentasNuevaClient
           productos={productosVenta}
+          sucursalId={sucursal.id}
           sucursalNombre={sucursal.nombre}
           cajaActiva={
             cajaActiva
