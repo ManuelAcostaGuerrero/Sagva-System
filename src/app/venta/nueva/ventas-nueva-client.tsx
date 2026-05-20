@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CreditCard, Plus, Search, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { guardarVentaAction } from "./actions";
@@ -58,6 +58,8 @@ export function VentasNuevaClient({
   sucursalId,
   sucursalNombre,
 }: NuevaVentaClientProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const efectivoInputRef = useRef<HTMLInputElement>(null);
   const [busqueda, setBusqueda] = useState("");
   const [lineas, setLineas] = useState<LineaVenta[]>([]);
   const [pagos, setPagos] = useState<PagoVenta[]>([]);
@@ -66,6 +68,10 @@ export function VentasNuevaClient({
   const [referenciaPago, setReferenciaPago] = useState("");
   const [cliente, setCliente] = useState("");
   const [observacion, setObservacion] = useState("");
+  const [quickMetodo, setQuickMetodo] = useState("");
+  const [efectivoRecibido, setEfectivoRecibido] = useState("");
+  const [dialogoEfectivoAbierto, setDialogoEfectivoAbierto] = useState(false);
+  const [bannerVuelto, setBannerVuelto] = useState<{ pago: number; vuelto: number } | null>(null);
 
   const productosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -108,6 +114,7 @@ export function VentasNuevaClient({
   const saldoPendiente = Math.max(total - totalPagado, 0);
   const vuelto = Math.max(totalPagado - total, 0);
   const puedeAgregarPago = lineas.length > 0 && total > 0 && saldoPendiente > 0;
+  const puedeCobroRapido = lineas.length > 0 && total > 0 && !!cajaActiva && pagos.length === 0;
 
   const lineasPayload = JSON.stringify(
     lineas.map((linea) => ({
@@ -126,7 +133,39 @@ export function VentasNuevaClient({
     })),
   );
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pago = Number(params.get("pago") ?? "");
+    const vueltoParam = Number(params.get("vuelto") ?? "");
+
+    if (params.get("success") === "cobrada" && Number.isFinite(pago) && Number.isFinite(vueltoParam)) {
+      setBannerVuelto({ pago, vuelto: vueltoParam });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!dialogoEfectivoAbierto) return;
+    setTimeout(() => efectivoInputRef.current?.focus(), 50);
+  }, [dialogoEfectivoAbierto]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+      if (!["F2", "F6", "F8", "F10"].includes(event.key)) return;
+      event.preventDefault();
+
+      if (event.key === "F2") iniciarCobroRapido("efectivo");
+      if (event.key === "F6") iniciarCobroRapido("debito");
+      if (event.key === "F8") iniciarCobroRapido("credito");
+      if (event.key === "F10") iniciarCobroRapido("transferencia");
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
   function agregarProducto(producto: ProductoVenta) {
+    setBannerVuelto(null);
     setLineas((current) => {
       const existente = current.find((linea) => linea.articuloId === producto.articuloId);
 
@@ -199,6 +238,10 @@ export function VentasNuevaClient({
     setCliente("");
     setObservacion("");
     setBusqueda("");
+    setQuickMetodo("");
+    setEfectivoRecibido("");
+    setDialogoEfectivoAbierto(false);
+    setBannerVuelto(null);
   }
 
   function agregarPago() {
@@ -231,361 +274,483 @@ export function VentasNuevaClient({
     setMontoPago(saldoPendiente > 0 ? String(saldoPendiente) : "");
   }
 
+  function iniciarCobroRapido(metodo: string) {
+    if (!puedeCobroRapido) return;
+
+    if (metodo === "efectivo") {
+      setQuickMetodo("efectivo");
+      setEfectivoRecibido(String(total));
+      setDialogoEfectivoAbierto(true);
+      return;
+    }
+
+    setQuickMetodo(metodo);
+    setEfectivoRecibido("");
+    setTimeout(() => formRef.current?.requestSubmit(), 0);
+  }
+
+  function confirmarEfectivo() {
+    const pago = Number(efectivoRecibido);
+    if (!Number.isFinite(pago) || pago < total) return;
+    setQuickMetodo("efectivo");
+    setTimeout(() => formRef.current?.requestSubmit(), 0);
+  }
+
   return (
-    <form action={guardarVentaAction} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
-      <input type="hidden" name="sucursalId" value={sucursalId} />
-      <input type="hidden" name="cajaId" value={cajaActiva?.id ?? ""} />
-      <input type="hidden" name="cliente" value={cliente} />
-      <input type="hidden" name="observacion" value={observacion} />
-      <input type="hidden" name="lineas" value={lineasPayload} />
-      <input type="hidden" name="pagos" value={pagosPayload} />
+    <>
+      <form ref={formRef} action={guardarVentaAction} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
+        <input type="hidden" name="sucursalId" value={sucursalId} />
+        <input type="hidden" name="cajaId" value={cajaActiva?.id ?? ""} />
+        <input type="hidden" name="cliente" value={cliente} />
+        <input type="hidden" name="observacion" value={observacion} />
+        <input type="hidden" name="lineas" value={lineasPayload} />
+        <input type="hidden" name="pagos" value={pagosPayload} />
+        <input type="hidden" name="quickMetodo" value={quickMetodo} />
+        <input type="hidden" name="efectivoRecibido" value={efectivoRecibido} />
 
-      <div className="space-y-5">
-        <div className="sagva-panel p-5">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="sagva-label">Cliente</label>
-              <input
-                className="sagva-field"
-                value={cliente}
-                onChange={(event) => setCliente(event.target.value)}
-                placeholder="Cliente general o RUT/RUC"
-              />
-            </div>
-            <div>
-              <label className="sagva-label">Sucursal</label>
-              <input className="sagva-field" value={sucursalNombre} readOnly />
-            </div>
-            <div>
-              <label className="sagva-label">Caja activa</label>
-              <input
-                className="sagva-field"
-                value={cajaActiva ? `${cajaActiva.nombre} - ${cajaActiva.estado}` : "Sin caja abierta"}
-                readOnly
-              />
+        <div className="space-y-5">
+          <div className="sagva-panel p-5">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <label className="sagva-label">Cliente</label>
+                <input
+                  className="sagva-field"
+                  value={cliente}
+                  onChange={(event) => setCliente(event.target.value)}
+                  placeholder="Cliente general o RUT/RUC"
+                />
+              </div>
+              <div>
+                <label className="sagva-label">Sucursal</label>
+                <input className="sagva-field" value={sucursalNombre} readOnly />
+              </div>
+              <div>
+                <label className="sagva-label">Caja activa</label>
+                <input
+                  className="sagva-field"
+                  value={cajaActiva ? `${cajaActiva.nombre} - ${cajaActiva.estado}` : "Sin caja abierta"}
+                  readOnly
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="sagva-panel overflow-visible">
-          <div className="sagva-panel-title flex items-center justify-between gap-3">
-            <span>Producto</span>
-            <span className="text-xs font-semibold text-slate-500">
-              Busca por nombre, código interno o código de barra
-            </span>
+          <div className="sagva-panel overflow-visible">
+            <div className="sagva-panel-title flex items-center justify-between gap-3">
+              <span>Producto</span>
+              <span className="text-xs font-semibold text-slate-500">
+                Busca por nombre, código interno o código de barra
+              </span>
+            </div>
+            <div className="p-4">
+              <label className="sagva-label">Nombre o código del producto</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  className="sagva-field pl-9"
+                  value={busqueda}
+                  onChange={(event) => setBusqueda(event.target.value)}
+                  placeholder="Escribe para desplegar productos..."
+                />
+
+                {busqueda.trim() ? (
+                  <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-80 overflow-y-auto rounded-lg border border-[#d8dee8] bg-white shadow-lg">
+                    {productosFiltrados.map((producto) => {
+                      const sinStock = producto.stockDisponible <= 0;
+                      return (
+                        <button
+                          key={producto.articuloId}
+                          type="button"
+                          onClick={() => agregarProducto(producto)}
+                          className={`flex w-full items-center justify-between gap-4 border-b px-4 py-3 text-left last:border-b-0 ${
+                            sinStock
+                              ? "border-amber-200 bg-amber-50 hover:bg-amber-100"
+                              : "border-[#eef2f7] hover:bg-blue-50"
+                          }`}
+                        >
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-bold text-slate-950">{producto.nombreArticulo}</p>
+                              {sinStock ? (
+                                <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                                  Sin stock
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              Código: {producto.codigoProducto}
+                              {producto.codigoBarra ? ` · Barra: ${producto.codigoBarra}` : ""}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-[#064ea4]">{money(producto.precioPublico)}</p>
+                            <p className={`text-xs font-semibold ${sinStock ? "text-amber-800" : "text-slate-500"}`}>
+                              Stock {producto.stockDisponible}
+                            </p>
+                          </div>
+                          <Plus className="h-4 w-4 shrink-0 text-[#064ea4]" aria-hidden="true" />
+                        </button>
+                      );
+                    })}
+
+                    {productosFiltrados.length === 0 ? (
+                      <div className="px-4 py-5 text-sm text-slate-500">
+                        No se encontraron productos para esa búsqueda.
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Los productos sin stock se muestran en amarillo. Se pueden vender, pero quedarán con stock negativo.
+              </p>
+            </div>
           </div>
-          <div className="p-4">
-            <label className="sagva-label">Nombre o código del producto</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                className="sagva-field pl-9"
-                value={busqueda}
-                onChange={(event) => setBusqueda(event.target.value)}
-                placeholder="Escribe para desplegar productos..."
-              />
 
-              {busqueda.trim() ? (
-                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-80 overflow-y-auto rounded-lg border border-[#d8dee8] bg-white shadow-lg">
-                  {productosFiltrados.map((producto) => {
-                    const sinStock = producto.stockDisponible <= 0;
+          <div className="sagva-panel overflow-hidden">
+            <div className="sagva-panel-title">Detalle de venta</div>
+            <div className="overflow-x-auto">
+              <table className="sagva-table">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Cant.</th>
+                    <th>Precio</th>
+                    <th>Desc.</th>
+                    <th>Total</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineas.map((linea) => {
+                    const sinStock = linea.stockDisponible <= 0;
                     return (
-                      <button
-                        key={producto.articuloId}
-                        type="button"
-                        onClick={() => agregarProducto(producto)}
-                        className={`flex w-full items-center justify-between gap-4 border-b px-4 py-3 text-left last:border-b-0 ${
-                          sinStock
-                            ? "border-amber-200 bg-amber-50 hover:bg-amber-100"
-                            : "border-[#eef2f7] hover:bg-blue-50"
-                        }`}
-                      >
-                        <div>
+                      <tr key={linea.articuloId} className={sinStock ? "bg-amber-50" : undefined}>
+                        <td>
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-bold text-slate-950">{producto.nombreArticulo}</p>
+                            <p className="font-bold text-slate-950">{linea.nombreArticulo}</p>
                             {sinStock ? (
                               <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-bold text-amber-900">
-                                Sin stock
+                                Venta sin stock
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-xs text-slate-500">
-                            Código: {producto.codigoProducto}
-                            {producto.codigoBarra ? ` · Barra: ${producto.codigoBarra}` : ""}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-[#064ea4]">{money(producto.precioPublico)}</p>
-                          <p className={`text-xs font-semibold ${sinStock ? "text-amber-800" : "text-slate-500"}`}>
-                            Stock {producto.stockDisponible}
-                          </p>
-                        </div>
-                        <Plus className="h-4 w-4 shrink-0 text-[#064ea4]" aria-hidden="true" />
-                      </button>
+                          <p className="text-xs text-slate-500">{linea.codigoProducto}</p>
+                        </td>
+                        <td>
+                          <input
+                            className="sagva-field w-20"
+                            type="number"
+                            min={1}
+                            value={linea.cantidad}
+                            onChange={(event) =>
+                              cambiarCantidad(linea.articuloId, Number(event.target.value))
+                            }
+                          />
+                        </td>
+                        <td>{money(linea.precioUnitario)}</td>
+                        <td>
+                          <input
+                            className="sagva-field w-28"
+                            type="number"
+                            min={0}
+                            value={linea.descuento}
+                            onChange={(event) =>
+                              cambiarDescuento(linea.articuloId, Number(event.target.value))
+                            }
+                          />
+                        </td>
+                        <td className="font-bold text-slate-950">{money(linea.totalLinea)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => eliminarLinea(linea.articuloId)}
+                            className="rounded-md p-2 text-red-600 hover:bg-red-50"
+                            title="Eliminar producto"
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
-
-                  {productosFiltrados.length === 0 ? (
-                    <div className="px-4 py-5 text-sm text-slate-500">
-                      No se encontraron productos para esa búsqueda.
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            <p className="mt-2 text-xs text-slate-500">
-              Los productos sin stock se muestran en amarillo. Se pueden vender, pero quedarán con stock negativo.
-            </p>
-          </div>
-        </div>
-
-        <div className="sagva-panel overflow-hidden">
-          <div className="sagva-panel-title">Detalle de venta</div>
-          <div className="overflow-x-auto">
-            <table className="sagva-table">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>Cant.</th>
-                  <th>Precio</th>
-                  <th>Desc.</th>
-                  <th>Total</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {lineas.map((linea) => {
-                  const sinStock = linea.stockDisponible <= 0;
-                  return (
-                    <tr key={linea.articuloId} className={sinStock ? "bg-amber-50" : undefined}>
-                      <td>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-bold text-slate-950">{linea.nombreArticulo}</p>
-                          {sinStock ? (
-                            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-bold text-amber-900">
-                              Venta sin stock
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="text-xs text-slate-500">{linea.codigoProducto}</p>
-                      </td>
-                      <td>
-                        <input
-                          className="sagva-field w-20"
-                          type="number"
-                          min={1}
-                          value={linea.cantidad}
-                          onChange={(event) =>
-                            cambiarCantidad(linea.articuloId, Number(event.target.value))
-                          }
-                        />
-                      </td>
-                      <td>{money(linea.precioUnitario)}</td>
-                      <td>
-                        <input
-                          className="sagva-field w-28"
-                          type="number"
-                          min={0}
-                          value={linea.descuento}
-                          onChange={(event) =>
-                            cambiarDescuento(linea.articuloId, Number(event.target.value))
-                          }
-                        />
-                      </td>
-                      <td className="font-bold text-slate-950">{money(linea.totalLinea)}</td>
-                      <td>
-                        <button
-                          type="button"
-                          onClick={() => eliminarLinea(linea.articuloId)}
-                          className="rounded-md p-2 text-red-600 hover:bg-red-50"
-                          title="Eliminar producto"
-                        >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        </button>
+                  {lineas.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-500">
+                        Todavía no hay productos agregados a esta venta.
                       </td>
                     </tr>
-                  );
-                })}
-                {lineas.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500">
-                      Todavía no hay productos agregados a esta venta.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <aside className="space-y-5">
-        <div className="sagva-panel p-5">
-          <h2 className="text-lg font-bold text-slate-950">Resumen</h2>
-          <div className="mt-4 space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Subtotal</span>
-              <span className="font-bold">{money(subtotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Descuento</span>
-              <span className="font-bold">{money(descuentoTotal)}</span>
-            </div>
-            <div className="flex justify-between border-t border-[#d8dee8] pt-3 text-base">
-              <span className="font-bold text-slate-950">Total</span>
-              <span className="font-bold text-[#064ea4]">{money(total)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Total pagado</span>
-              <span className="font-bold">{money(totalPagado)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Saldo pendiente</span>
-              <span className="font-bold text-red-700">{money(saldoPendiente)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Vuelto</span>
-              <span className="font-bold text-green-700">{money(vuelto)}</span>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
 
-        <div className="sagva-panel p-5">
-          <h2 className="flex items-center gap-2 text-lg font-bold text-slate-950">
-            <CreditCard className="h-5 w-5" aria-hidden="true" />
-            Pagos
-          </h2>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {metodosPago.map((metodo) => (
+          <div className="sagva-panel p-4">
+            <div className="grid gap-3 md:grid-cols-4">
               <button
-                key={metodo}
                 type="button"
-                onClick={() => seleccionarMetodoPago(metodo)}
-                disabled={!puedeAgregarPago}
-                className={`rounded-md border px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50 ${
-                  metodoPago === metodo
-                    ? "border-[#064ea4] bg-blue-50 text-[#064ea4]"
-                    : "border-[#d8dee8] bg-white text-slate-700"
-                }`}
+                onClick={() => iniciarCobroRapido("efectivo")}
+                disabled={!puedeCobroRapido}
+                className="rounded-md bg-[#064ea4] px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {metodo}
+                Efectivo F2
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => iniciarCobroRapido("debito")}
+                disabled={!puedeCobroRapido}
+                className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Débito F6
+              </button>
+              <button
+                type="button"
+                onClick={() => iniciarCobroRapido("credito")}
+                disabled={!puedeCobroRapido}
+                className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Crédito F8
+              </button>
+              <button
+                type="button"
+                onClick={() => iniciarCobroRapido("transferencia")}
+                disabled={!puedeCobroRapido}
+                className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Transferencia F10
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Cobro rápido: se usa cuando no hay pagos parciales registrados. Para pagos mixtos usa el panel avanzado.
+            </p>
+            {bannerVuelto ? (
+              <div className="mt-3 rounded-lg bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
+                Venta cobrada en efectivo. Pagó {money(bannerVuelto.pago)} · Vuelto {money(bannerVuelto.vuelto)}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <aside className="space-y-5">
+          <div className="sagva-panel p-5">
+            <h2 className="text-lg font-bold text-slate-950">Resumen</h2>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Subtotal</span>
+                <span className="font-bold">{money(subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Descuento</span>
+                <span className="font-bold">{money(descuentoTotal)}</span>
+              </div>
+              <div className="flex justify-between border-t border-[#d8dee8] pt-3 text-base">
+                <span className="font-bold text-slate-950">Total</span>
+                <span className="font-bold text-[#064ea4]">{money(total)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total pagado</span>
+                <span className="font-bold">{money(totalPagado)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Saldo pendiente</span>
+                <span className="font-bold text-red-700">{money(saldoPendiente)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Vuelto</span>
+                <span className="font-bold text-green-700">{money(vuelto)}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-4 space-y-3">
-            <div>
-              <label className="sagva-label">Monto a ingresar</label>
-              <input
-                className="sagva-field"
-                type="number"
-                min={0}
-                max={saldoPendiente}
-                value={montoPago}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  if (!Number.isFinite(value)) {
-                    setMontoPago("");
-                    return;
-                  }
-                  setMontoPago(String(Math.min(Math.max(value, 0), saldoPendiente)));
-                }}
-                placeholder={String(saldoPendiente || total || 0)}
-                disabled={!puedeAgregarPago}
-              />
+          <div className="sagva-panel p-5">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-slate-950">
+              <CreditCard className="h-5 w-5" aria-hidden="true" />
+              Pagos
+            </h2>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {metodosPago.map((metodo) => (
+                <button
+                  key={metodo}
+                  type="button"
+                  onClick={() => seleccionarMetodoPago(metodo)}
+                  disabled={!puedeAgregarPago}
+                  className={`rounded-md border px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50 ${
+                    metodoPago === metodo
+                      ? "border-[#064ea4] bg-blue-50 text-[#064ea4]"
+                      : "border-[#d8dee8] bg-white text-slate-700"
+                  }`}
+                >
+                  {metodo}
+                </button>
+              ))}
             </div>
-            <div>
-              <label className="sagva-label">Referencia</label>
-              <input
-                className="sagva-field"
-                value={referenciaPago}
-                onChange={(event) => setReferenciaPago(event.target.value)}
-                placeholder="Código operación, voucher, nota"
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="sagva-label">Monto a ingresar</label>
+                <input
+                  className="sagva-field"
+                  type="number"
+                  min={0}
+                  max={saldoPendiente}
+                  value={montoPago}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (!Number.isFinite(value)) {
+                      setMontoPago("");
+                      return;
+                    }
+                    setMontoPago(String(Math.min(Math.max(value, 0), saldoPendiente)));
+                  }}
+                  placeholder={String(saldoPendiente || total || 0)}
+                  disabled={!puedeAgregarPago}
+                />
+              </div>
+              <div>
+                <label className="sagva-label">Referencia</label>
+                <input
+                  className="sagva-field"
+                  value={referenciaPago}
+                  onChange={(event) => setReferenciaPago(event.target.value)}
+                  placeholder="Código operación, voucher, nota"
+                  disabled={!puedeAgregarPago}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={agregarPago}
                 disabled={!puedeAgregarPago}
-              />
+                className="w-full sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saldoPendiente > 0 ? "Agregar pago" : "Pago completo"}
+              </button>
+              {lineas.length > 0 && saldoPendiente === 0 ? (
+                <p className="rounded-md bg-green-50 px-3 py-2 text-xs font-semibold text-green-700">
+                  El total ya está cubierto. Elimina un pago si necesitas cambiar el método o monto.
+                </p>
+              ) : null}
             </div>
+
+            <div className="mt-4 space-y-2">
+              {pagos.map((pago) => (
+                <div
+                  key={pago.id}
+                  className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-sm"
+                >
+                  <span className="font-bold">{pago.metodo}</span>
+                  <div className="flex items-center gap-2">
+                    <span>{money(pago.monto)}</span>
+                    <button
+                      type="button"
+                      onClick={() => eliminarPago(pago.id)}
+                      className="rounded p-1 text-red-600 hover:bg-red-50"
+                      title="Eliminar pago"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {pagos.length === 0 ? (
+                <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                  No hay pagos registrados.
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="sagva-panel p-5">
+            <h2 className="text-lg font-bold text-slate-950">Observación</h2>
+            <textarea
+              className="sagva-field mt-3 min-h-24"
+              value={observacion}
+              onChange={(event) => setObservacion(event.target.value)}
+              placeholder="Observaciones internas de la venta"
+            />
+          </div>
+
+          <div className="grid gap-3">
+            <button
+              type="submit"
+              name="accion"
+              value="cobrar"
+              disabled={!lineas.length || saldoPendiente > 0 || !cajaActiva}
+              className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cobrar venta
+            </button>
+            <button
+              type="submit"
+              name="accion"
+              value="pendiente"
+              disabled={!lineas.length}
+              className="sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Guardar pendiente
+            </button>
             <button
               type="button"
-              onClick={agregarPago}
-              disabled={!puedeAgregarPago}
-              className="w-full sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={limpiarVenta}
+              className="rounded-md border border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-50"
             >
-              {saldoPendiente > 0 ? "Agregar pago" : "Pago completo"}
+              Anular pestaña
             </button>
-            {lineas.length > 0 && saldoPendiente === 0 ? (
-              <p className="rounded-md bg-green-50 px-3 py-2 text-xs font-semibold text-green-700">
-                El total ya está cubierto. Elimina un pago si necesitas cambiar el método o monto.
-              </p>
-            ) : null}
           </div>
+        </aside>
+      </form>
 
-          <div className="mt-4 space-y-2">
-            {pagos.map((pago) => (
-              <div
-                key={pago.id}
-                className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-sm"
+      {dialogoEfectivoAbierto ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-950">Pago en efectivo</h2>
+            <p className="mt-1 text-sm text-slate-500">Total a pagar: {money(total)}</p>
+            <label className="sagva-label mt-4">¿Con cuánto pagó?</label>
+            <input
+              ref={efectivoInputRef}
+              className="sagva-field"
+              type="number"
+              min={total}
+              value={efectivoRecibido}
+              onChange={(event) => setEfectivoRecibido(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  confirmarEfectivo();
+                }
+                if (event.key === "Escape") {
+                  setDialogoEfectivoAbierto(false);
+                  setQuickMetodo("");
+                }
+              }}
+            />
+            <div className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm">
+              Vuelto estimado: <strong>{money(Math.max(Number(efectivoRecibido || 0) - total, 0))}</strong>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDialogoEfectivoAbierto(false);
+                  setQuickMetodo("");
+                }}
+                className="sagva-button-secondary"
               >
-                <span className="font-bold">{pago.metodo}</span>
-                <div className="flex items-center gap-2">
-                  <span>{money(pago.monto)}</span>
-                  <button
-                    type="button"
-                    onClick={() => eliminarPago(pago.id)}
-                    className="rounded p-1 text-red-600 hover:bg-red-50"
-                    title="Eliminar pago"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-            ))}
-            {pagos.length === 0 ? (
-              <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
-                No hay pagos registrados.
-              </p>
-            ) : null}
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarEfectivo}
+                disabled={Number(efectivoRecibido || 0) < total}
+                className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </div>
-
-        <div className="sagva-panel p-5">
-          <h2 className="text-lg font-bold text-slate-950">Observación</h2>
-          <textarea
-            className="sagva-field mt-3 min-h-24"
-            value={observacion}
-            onChange={(event) => setObservacion(event.target.value)}
-            placeholder="Observaciones internas de la venta"
-          />
-        </div>
-
-        <div className="grid gap-3">
-          <button
-            type="submit"
-            name="accion"
-            value="cobrar"
-            disabled={!lineas.length || saldoPendiente > 0 || !cajaActiva}
-            className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Cobrar venta
-          </button>
-          <button
-            type="submit"
-            name="accion"
-            value="pendiente"
-            disabled={!lineas.length}
-            className="sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Guardar pendiente
-          </button>
-          <button
-            type="button"
-            onClick={limpiarVenta}
-            className="rounded-md border border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-50"
-          >
-            Anular pestaña
-          </button>
-        </div>
-      </aside>
-    </form>
+      ) : null}
+    </>
   );
 }
