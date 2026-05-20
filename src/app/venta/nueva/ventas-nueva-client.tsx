@@ -21,12 +21,16 @@ type CajaActiva = {
   estado: string;
 } | null;
 
+type TipoDescuento = "monto" | "porcentaje";
+
 type LineaVenta = {
   articuloId: string;
   codigoProducto: string;
   nombreArticulo: string;
   cantidad: number;
   precioUnitario: number;
+  descuentoTipo: TipoDescuento;
+  descuentoValor: number;
   descuento: number;
   totalLinea: number;
   stockDisponible: number;
@@ -83,6 +87,22 @@ function totalPagadoVenta(pagos: PagoVenta[]) {
   return pagos.reduce((sum, pago) => sum + pago.monto, 0);
 }
 
+function calcularDescuento(linea: Pick<LineaVenta, "cantidad" | "precioUnitario" | "descuentoTipo" | "descuentoValor">) {
+  const bruto = Math.max(linea.cantidad * linea.precioUnitario, 0);
+  const valor = Math.max(Number(linea.descuentoValor) || 0, 0);
+  const descuento = linea.descuentoTipo === "porcentaje" ? bruto * (Math.min(valor, 100) / 100) : valor;
+  return Math.min(descuento, bruto);
+}
+
+function recalcularLinea(linea: LineaVenta): LineaVenta {
+  const descuento = calcularDescuento(linea);
+  return {
+    ...linea,
+    descuento,
+    totalLinea: Math.max(linea.cantidad * linea.precioUnitario - descuento, 0),
+  };
+}
+
 export function VentasNuevaClient({
   productos,
   cajaActiva,
@@ -91,18 +111,14 @@ export function VentasNuevaClient({
 }: NuevaVentaClientProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const efectivoInputRef = useRef<HTMLInputElement>(null);
+  const primeraVentaRef = useRef(crearVentaTemporal(1));
   const [busqueda, setBusqueda] = useState("");
-  const [ventas, setVentas] = useState<VentaTemporal[]>(() => [crearVentaTemporal(1)]);
-  const [ventaActivaId, setVentaActivaId] = useState(() => ventasInicialId());
+  const [ventas, setVentas] = useState<VentaTemporal[]>(() => [primeraVentaRef.current]);
+  const [ventaActivaId, setVentaActivaId] = useState(() => primeraVentaRef.current.id);
   const [quickMetodo, setQuickMetodo] = useState("");
   const [efectivoRecibido, setEfectivoRecibido] = useState("");
   const [dialogoEfectivoAbierto, setDialogoEfectivoAbierto] = useState(false);
   const [bannerVuelto, setBannerVuelto] = useState<{ pago: number; vuelto: number } | null>(null);
-
-  function ventasInicialId() {
-    const venta = crearVentaTemporal(1);
-    return venta.id;
-  }
 
   const ventaActiva = ventas.find((venta) => venta.id === ventaActivaId) ?? ventas[0];
 
@@ -248,12 +264,7 @@ export function VentasNuevaClient({
           ...venta,
           lineas: venta.lineas.map((linea) => {
             if (linea.articuloId !== producto.articuloId) return linea;
-            const nuevaCantidad = linea.cantidad + 1;
-            return {
-              ...linea,
-              cantidad: nuevaCantidad,
-              totalLinea: Math.max(nuevaCantidad * linea.precioUnitario - linea.descuento, 0),
-            };
+            return recalcularLinea({ ...linea, cantidad: linea.cantidad + 1 });
           }),
         };
       }
@@ -268,6 +279,8 @@ export function VentasNuevaClient({
             nombreArticulo: producto.nombreArticulo,
             cantidad: 1,
             precioUnitario: producto.precioPublico,
+            descuentoTipo: "monto",
+            descuentoValor: 0,
             descuento: 0,
             totalLinea: producto.precioPublico,
             stockDisponible: producto.stockDisponible,
@@ -283,27 +296,27 @@ export function VentasNuevaClient({
       ...venta,
       lineas: venta.lineas.map((linea) => {
         if (linea.articuloId !== articuloId) return linea;
-        const nextCantidad = Math.max(cantidad, 1);
-        return {
-          ...linea,
-          cantidad: nextCantidad,
-          totalLinea: Math.max(nextCantidad * linea.precioUnitario - linea.descuento, 0),
-        };
+        return recalcularLinea({ ...linea, cantidad: Math.max(cantidad, 1) });
       }),
     }));
   }
 
-  function cambiarDescuento(articuloId: string, descuento: number) {
+  function cambiarTipoDescuento(articuloId: string, descuentoTipo: TipoDescuento) {
     actualizarVentaActiva((venta) => ({
       ...venta,
       lineas: venta.lineas.map((linea) => {
         if (linea.articuloId !== articuloId) return linea;
-        const nextDescuento = Math.max(descuento, 0);
-        return {
-          ...linea,
-          descuento: nextDescuento,
-          totalLinea: Math.max(linea.cantidad * linea.precioUnitario - nextDescuento, 0),
-        };
+        return recalcularLinea({ ...linea, descuentoTipo, descuentoValor: 0 });
+      }),
+    }));
+  }
+
+  function cambiarDescuento(articuloId: string, descuentoValor: number) {
+    actualizarVentaActiva((venta) => ({
+      ...venta,
+      lineas: venta.lineas.map((linea) => {
+        if (linea.articuloId !== articuloId) return linea;
+        return recalcularLinea({ ...linea, descuentoValor: Math.max(descuentoValor, 0) });
       }),
     }));
   }
@@ -589,6 +602,8 @@ export function VentasNuevaClient({
                             type="number"
                             min={1}
                             value={linea.cantidad}
+                            onFocus={(event) => event.currentTarget.select()}
+                            onClick={(event) => event.currentTarget.select()}
                             onChange={(event) =>
                               cambiarCantidad(linea.articuloId, Number(event.target.value))
                             }
@@ -596,15 +611,33 @@ export function VentasNuevaClient({
                         </td>
                         <td>{money(linea.precioUnitario)}</td>
                         <td>
-                          <input
-                            className="sagva-field w-28"
-                            type="number"
-                            min={0}
-                            value={linea.descuento}
-                            onChange={(event) =>
-                              cambiarDescuento(linea.articuloId, Number(event.target.value))
-                            }
-                          />
+                          <div className="flex min-w-44 items-center gap-2">
+                            <select
+                              className="sagva-field w-24"
+                              value={linea.descuentoTipo}
+                              onChange={(event) =>
+                                cambiarTipoDescuento(linea.articuloId, event.target.value as TipoDescuento)
+                              }
+                            >
+                              <option value="monto">Monto</option>
+                              <option value="porcentaje">%</option>
+                            </select>
+                            <input
+                              className="sagva-field w-24"
+                              type="number"
+                              min={0}
+                              max={linea.descuentoTipo === "porcentaje" ? 100 : undefined}
+                              value={linea.descuentoValor}
+                              onFocus={(event) => event.currentTarget.select()}
+                              onClick={(event) => event.currentTarget.select()}
+                              onChange={(event) =>
+                                cambiarDescuento(linea.articuloId, Number(event.target.value))
+                              }
+                            />
+                          </div>
+                          {linea.descuento > 0 ? (
+                            <p className="mt-1 text-xs text-slate-500">-{money(linea.descuento)}</p>
+                          ) : null}
                         </td>
                         <td className="font-bold text-slate-950">{money(linea.totalLinea)}</td>
                         <td>
@@ -754,6 +787,8 @@ export function VentasNuevaClient({
                   min={0}
                   max={saldoPendiente}
                   value={montoPago}
+                  onFocus={(event) => event.currentTarget.select()}
+                  onClick={(event) => event.currentTarget.select()}
                   onChange={(event) => {
                     const value = Number(event.target.value);
                     if (!Number.isFinite(value)) {
@@ -854,6 +889,8 @@ export function VentasNuevaClient({
               type="number"
               min={total}
               value={efectivoRecibido}
+              onFocus={(event) => event.currentTarget.select()}
+              onClick={(event) => event.currentTarget.select()}
               onChange={(event) => setEfectivoRecibido(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
