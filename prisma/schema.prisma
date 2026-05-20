@@ -102,7 +102,7 @@ model Subfamilia {
   familiaId String     @map("familia_id")
   familia   Familia    @relation(fields: [familiaId], references: [id])
   articulos Articulo[]
-  createdAt DateTime   @default(now()) @map("created_at")
+  createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt @map("updated_at")
 
   @@map("subfamilias")
@@ -113,7 +113,7 @@ model Marca {
   nombre    String
   estado    String     @default("activo")
   articulos Articulo[]
-  createdAt DateTime   @default(now()) @map("created_at")
+  createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt @map("updated_at")
 
   @@map("marcas")
@@ -198,7 +198,7 @@ model InventarioMovimiento {
   observacion         String?
   usuarioId           String?  @map("usuario_id")
   usuario             Usuario? @relation(fields: [usuarioId], references: [id])
-  createdAt           DateTime @default(now()) @map("created_at")
+  createdAt           DateTime @default(now())
 
   @@map("inventario_movimientos")
 }
@@ -231,7 +231,7 @@ model ProveedorProductoAsociado {
   productoProveedorNombre  String    @map("producto_proveedor_nombre")
   articuloId               String    @map("articulo_id")
   articulo                 Articulo  @relation(fields: [articuloId], references: [id])
-  createdAt                DateTime  @default(now()) @map("created_at")
+  createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt @map("updated_at")
 
   @@unique([proveedorId, productoProveedorCodigo])
@@ -270,7 +270,7 @@ model FacturaDetalle {
   impuesto                 String?
   totalLinea               Decimal @map("total_linea")
   diferencia               FacturaDiferencia?
-  createdAt                DateTime            @default(now()) @map("created_at")
+  createdAt                DateTime            @default(now())
 
   @@map("factura_detalles")
 }
@@ -284,7 +284,7 @@ model FacturaDiferencia {
   montoDiferencia Decimal @map("monto_diferencia")
   estado          String         @default("pendiente")
   observacion     String?
-  createdAt       DateTime       @default(now()) @map("created_at")
+  createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@map("factura_diferencias")
@@ -324,7 +324,7 @@ model VentaDetalle {
   cantidad       Decimal
   precioUnitario Decimal @map("precio_unitario")
   totalLinea     Decimal @map("total_linea")
-  createdAt      DateTime @default(now()) @map("created_at")
+  createdAt      DateTime @default(now())
 
   @@map("venta_detalles")
 }
@@ -335,7 +335,6 @@ model VentaPago {
   venta      Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   metodoPago String   @map("metodo_pago")
   monto      Decimal
-  referencia String?
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("venta_pagos")
@@ -346,7 +345,7 @@ model VentaAnulacion {
   ventaId   String   @map("venta_id")
   venta     Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   motivo    String
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now())
 
   @@map("venta_anulaciones")
 }
@@ -367,7 +366,7 @@ model Caja {
   aperturas      CajaApertura[]
   cierres        CajaCierre[]
   movimientos    CajaMovimiento[]
-  createdAt      DateTime         @default(now()) @map("created_at")
+  createdAt      DateTime         @default(now())
 
   @@map("cajas")
 }
@@ -378,7 +377,7 @@ model CajaApertura {
   caja         Caja     @relation(fields: [cajaId], references: [id], onDelete: Cascade)
   montoInicial Decimal @map("monto_inicial")
   observacion  String?
-  createdAt    DateTime @default(now()) @map("created_at")
+  createdAt    DateTime @default(now())
 
   @@map("caja_aperturas")
 }
@@ -390,7 +389,7 @@ model CajaCierre {
   efectivoContado Decimal @map("efectivo_contado")
   diferencia      Decimal?
   observacion     String?
-  createdAt       DateTime @default(now()) @map("created_at")
+  createdAt       DateTime @default(now())
 
   @@map("caja_cierres")
 }
@@ -403,7 +402,7 @@ model CajaMovimiento {
   monto       Decimal
   concepto    String
   observacion String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime @default(now())
 
   @@map("caja_movimientos")
 }
@@ -418,7 +417,7 @@ model Ensamblaje {
   observacion    String?
   componentes    EnsamblajeComponente[]
   movimientos    EnsamblajeMovimiento[]
-  createdAt      DateTime               @default(now()) @map("created_at")
+  createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt @map("updated_at")
 
   @@map("ensamblajes")
@@ -443,7 +442,7 @@ model EnsamblajeMovimiento {
   tipo           String
   cantidad       Decimal
   motivo         String?
-  createdAt      DateTime    @default(now()) @map("created_at")
+  createdAt      DateTime    @default(now())
 
   @@map("ensamblaje_movimientos")
 }
@@ -455,7 +454,7 @@ model CalendarioFecha {
   tipo            String
   impactoEsperado String?  @map("impacto_esperado")
   observacion     String?
-  createdAt       DateTime @default(now()) @map("created_at")
+  createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@unique([fecha, tipo])
@@ -468,7 +467,7 @@ model ReporteConfiguracion {
   nombre    String
   filtros   String?
   estado    String   @default("activo")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("reportes_configuracion")
