@@ -498,6 +498,16 @@ export function VentasNuevaClient({
             </div>
           </div>
 
+          <div className="sagva-panel p-5">
+            <h2 className="text-lg font-bold text-slate-950">Observación</h2>
+            <textarea
+              className="sagva-field mt-3 min-h-20"
+              value={observacion}
+              onChange={(event) => setObservacion(event.target.value)}
+              placeholder="Observaciones internas de la venta"
+            />
+          </div>
+
           <div className="sagva-panel p-4">
             <div className="grid gap-3 md:grid-cols-4">
               <button
@@ -671,16 +681,6 @@ export function VentasNuevaClient({
                 </p>
               ) : null}
             </div>
-          </div>
-
-          <div className="sagva-panel p-5">
-            <h2 className="text-lg font-bold text-slate-950">Observación</h2>
-            <textarea
-              className="sagva-field mt-3 min-h-24"
-              value={observacion}
-              onChange={(event) => setObservacion(event.target.value)}
-              placeholder="Observaciones internas de la venta"
-            />
           </div>
 
           <div className="grid gap-3">
