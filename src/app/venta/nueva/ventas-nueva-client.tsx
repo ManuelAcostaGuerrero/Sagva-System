@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CreditCard, Plus, Trash2 } from "lucide-react";
+import { CreditCard, Plus, Trash2, X } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { guardarVentaAction } from "./actions";
 
@@ -38,6 +38,17 @@ type PagoVenta = {
   monto: number;
 };
 
+type VentaTemporal = {
+  id: string;
+  numero: number;
+  cliente: string;
+  lineas: LineaVenta[];
+  pagos: PagoVenta[];
+  observacion: string;
+  metodoPago: string;
+  montoPago: string;
+};
+
 type NuevaVentaClientProps = {
   productos: ProductoVenta[];
   cajaActiva: CajaActiva;
@@ -51,6 +62,27 @@ function money(value: number) {
   return formatCurrency(Number.isFinite(value) ? value : 0);
 }
 
+function crearVentaTemporal(numero: number): VentaTemporal {
+  return {
+    id: `venta-${Date.now()}-${numero}`,
+    numero,
+    cliente: "",
+    lineas: [],
+    pagos: [],
+    observacion: "",
+    metodoPago: "EFECTIVO",
+    montoPago: "",
+  };
+}
+
+function totalVenta(lineas: LineaVenta[]) {
+  return lineas.reduce((sum, linea) => sum + linea.totalLinea, 0);
+}
+
+function totalPagadoVenta(pagos: PagoVenta[]) {
+  return pagos.reduce((sum, pago) => sum + pago.monto, 0);
+}
+
 export function VentasNuevaClient({
   productos,
   cajaActiva,
@@ -60,16 +92,26 @@ export function VentasNuevaClient({
   const formRef = useRef<HTMLFormElement>(null);
   const efectivoInputRef = useRef<HTMLInputElement>(null);
   const [busqueda, setBusqueda] = useState("");
-  const [lineas, setLineas] = useState<LineaVenta[]>([]);
-  const [pagos, setPagos] = useState<PagoVenta[]>([]);
-  const [metodoPago, setMetodoPago] = useState("EFECTIVO");
-  const [montoPago, setMontoPago] = useState("");
-  const [cliente, setCliente] = useState("");
-  const [observacion, setObservacion] = useState("");
+  const [ventas, setVentas] = useState<VentaTemporal[]>(() => [crearVentaTemporal(1)]);
+  const [ventaActivaId, setVentaActivaId] = useState(() => ventasInicialId());
   const [quickMetodo, setQuickMetodo] = useState("");
   const [efectivoRecibido, setEfectivoRecibido] = useState("");
   const [dialogoEfectivoAbierto, setDialogoEfectivoAbierto] = useState(false);
   const [bannerVuelto, setBannerVuelto] = useState<{ pago: number; vuelto: number } | null>(null);
+
+  function ventasInicialId() {
+    const venta = crearVentaTemporal(1);
+    return venta.id;
+  }
+
+  const ventaActiva = ventas.find((venta) => venta.id === ventaActivaId) ?? ventas[0];
+
+  const lineas = ventaActiva?.lineas ?? [];
+  const pagos = ventaActiva?.pagos ?? [];
+  const cliente = ventaActiva?.cliente ?? "";
+  const observacion = ventaActiva?.observacion ?? "";
+  const metodoPago = ventaActiva?.metodoPago ?? "EFECTIVO";
+  const montoPago = ventaActiva?.montoPago ?? "";
 
   const productosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -99,16 +141,8 @@ export function VentasNuevaClient({
     [lineas],
   );
 
-  const total = useMemo(
-    () => lineas.reduce((sum, linea) => sum + linea.totalLinea, 0),
-    [lineas],
-  );
-
-  const totalPagado = useMemo(
-    () => pagos.reduce((sum, pago) => sum + pago.monto, 0),
-    [pagos],
-  );
-
+  const total = useMemo(() => totalVenta(lineas), [lineas]);
+  const totalPagado = useMemo(() => totalPagadoVenta(pagos), [pagos]);
   const saldoPendiente = Math.max(total - totalPagado, 0);
   const vuelto = Math.max(totalPagado - total, 0);
   const puedeAgregarPago = lineas.length > 0 && total > 0 && saldoPendiente > 0;
@@ -172,43 +206,82 @@ export function VentasNuevaClient({
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
+  function actualizarVentaActiva(updater: (venta: VentaTemporal) => VentaTemporal) {
+    setVentas((current) =>
+      current.map((venta) => (venta.id === ventaActivaId ? updater(venta) : venta)),
+    );
+  }
+
+  function crearNuevaInstanciaVenta() {
+    const nextNumero = Math.max(...ventas.map((venta) => venta.numero), 0) + 1;
+    const nuevaVenta = crearVentaTemporal(nextNumero);
+    setVentas((current) => [...current, nuevaVenta]);
+    setVentaActivaId(nuevaVenta.id);
+    setBusqueda("");
+    setQuickMetodo("");
+    setEfectivoRecibido("");
+    setDialogoEfectivoAbierto(false);
+  }
+
+  function cerrarVentaTemporal(id: string) {
+    if (ventas.length === 1) {
+      limpiarVenta();
+      return;
+    }
+
+    setVentas((current) => {
+      const filtradas = current.filter((venta) => venta.id !== id);
+      if (id === ventaActivaId) {
+        setVentaActivaId(filtradas[0]?.id ?? crearVentaTemporal(1).id);
+      }
+      return filtradas.length ? filtradas : [crearVentaTemporal(1)];
+    });
+  }
+
   function agregarProducto(producto: ProductoVenta) {
     setBannerVuelto(null);
-    setLineas((current) => {
-      const existente = current.find((linea) => linea.articuloId === producto.articuloId);
+    actualizarVentaActiva((venta) => {
+      const existente = venta.lineas.find((linea) => linea.articuloId === producto.articuloId);
 
       if (existente) {
-        return current.map((linea) => {
-          if (linea.articuloId !== producto.articuloId) return linea;
-          const nuevaCantidad = linea.cantidad + 1;
-          return {
-            ...linea,
-            cantidad: nuevaCantidad,
-            totalLinea: Math.max(nuevaCantidad * linea.precioUnitario - linea.descuento, 0),
-          };
-        });
+        return {
+          ...venta,
+          lineas: venta.lineas.map((linea) => {
+            if (linea.articuloId !== producto.articuloId) return linea;
+            const nuevaCantidad = linea.cantidad + 1;
+            return {
+              ...linea,
+              cantidad: nuevaCantidad,
+              totalLinea: Math.max(nuevaCantidad * linea.precioUnitario - linea.descuento, 0),
+            };
+          }),
+        };
       }
 
-      return [
-        ...current,
-        {
-          articuloId: producto.articuloId,
-          codigoProducto: producto.codigoProducto,
-          nombreArticulo: producto.nombreArticulo,
-          cantidad: 1,
-          precioUnitario: producto.precioPublico,
-          descuento: 0,
-          totalLinea: producto.precioPublico,
-          stockDisponible: producto.stockDisponible,
-        },
-      ];
+      return {
+        ...venta,
+        lineas: [
+          ...venta.lineas,
+          {
+            articuloId: producto.articuloId,
+            codigoProducto: producto.codigoProducto,
+            nombreArticulo: producto.nombreArticulo,
+            cantidad: 1,
+            precioUnitario: producto.precioPublico,
+            descuento: 0,
+            totalLinea: producto.precioPublico,
+            stockDisponible: producto.stockDisponible,
+          },
+        ],
+      };
     });
     setBusqueda("");
   }
 
   function cambiarCantidad(articuloId: string, cantidad: number) {
-    setLineas((current) =>
-      current.map((linea) => {
+    actualizarVentaActiva((venta) => ({
+      ...venta,
+      lineas: venta.lineas.map((linea) => {
         if (linea.articuloId !== articuloId) return linea;
         const nextCantidad = Math.max(cantidad, 1);
         return {
@@ -217,12 +290,13 @@ export function VentasNuevaClient({
           totalLinea: Math.max(nextCantidad * linea.precioUnitario - linea.descuento, 0),
         };
       }),
-    );
+    }));
   }
 
   function cambiarDescuento(articuloId: string, descuento: number) {
-    setLineas((current) =>
-      current.map((linea) => {
+    actualizarVentaActiva((venta) => ({
+      ...venta,
+      lineas: venta.lineas.map((linea) => {
         if (linea.articuloId !== articuloId) return linea;
         const nextDescuento = Math.max(descuento, 0);
         return {
@@ -231,19 +305,26 @@ export function VentasNuevaClient({
           totalLinea: Math.max(linea.cantidad * linea.precioUnitario - nextDescuento, 0),
         };
       }),
-    );
+    }));
   }
 
   function eliminarLinea(articuloId: string) {
-    setLineas((current) => current.filter((linea) => linea.articuloId !== articuloId));
+    actualizarVentaActiva((venta) => ({
+      ...venta,
+      lineas: venta.lineas.filter((linea) => linea.articuloId !== articuloId),
+    }));
   }
 
   function limpiarVenta() {
-    setLineas([]);
-    setPagos([]);
-    setMontoPago("");
-    setCliente("");
-    setObservacion("");
+    actualizarVentaActiva((venta) => ({
+      ...venta,
+      cliente: "",
+      lineas: [],
+      pagos: [],
+      observacion: "",
+      metodoPago: "EFECTIVO",
+      montoPago: "",
+    }));
     setBusqueda("");
     setQuickMetodo("");
     setEfectivoRecibido("");
@@ -259,24 +340,33 @@ export function VentasNuevaClient({
 
     const monto = Math.min(montoSolicitado, saldoPendiente);
 
-    setPagos((current) => [
-      ...current,
-      {
-        id: `pago-${Date.now()}`,
-        metodo: metodoPago,
-        monto,
-      },
-    ]);
-    setMontoPago("");
+    actualizarVentaActiva((venta) => ({
+      ...venta,
+      pagos: [
+        ...venta.pagos,
+        {
+          id: `pago-${Date.now()}`,
+          metodo: metodoPago,
+          monto,
+        },
+      ],
+      montoPago: "",
+    }));
   }
 
   function eliminarPago(pagoId: string) {
-    setPagos((current) => current.filter((pago) => pago.id !== pagoId));
+    actualizarVentaActiva((venta) => ({
+      ...venta,
+      pagos: venta.pagos.filter((pago) => pago.id !== pagoId),
+    }));
   }
 
   function seleccionarMetodoPago(metodo: string) {
-    setMetodoPago(metodo);
-    setMontoPago(saldoPendiente > 0 ? String(saldoPendiente) : "");
+    actualizarVentaActiva((venta) => ({
+      ...venta,
+      metodoPago: metodo,
+      montoPago: saldoPendiente > 0 ? String(saldoPendiente) : "",
+    }));
   }
 
   function iniciarCobroRapido(metodo: string) {
@@ -304,6 +394,60 @@ export function VentasNuevaClient({
 
   return (
     <>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {ventas.length > 1
+          ? ventas.map((venta) => {
+              const ventaTotal = totalVenta(venta.lineas);
+              const activa = venta.id === ventaActivaId;
+              return (
+                <button
+                  key={venta.id}
+                  type="button"
+                  onClick={() => setVentaActivaId(venta.id)}
+                  className={`flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-bold ${
+                    activa
+                      ? "border-[#064ea4] bg-blue-50 text-[#064ea4]"
+                      : "border-[#d8dee8] bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>Venta {venta.numero}</span>
+                  {venta.lineas.length > 0 ? (
+                    <span className="text-xs font-semibold text-slate-500">{money(ventaTotal)}</span>
+                  ) : null}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      cerrarVentaTemporal(venta.id);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        cerrarVentaTemporal(venta.id);
+                      }
+                    }}
+                    className="rounded-full p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    title="Cerrar venta"
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  </span>
+                </button>
+              );
+            })
+          : null}
+        <button
+          type="button"
+          onClick={crearNuevaInstanciaVenta}
+          className="inline-flex items-center gap-2 rounded-full border border-dashed border-[#064ea4] bg-white px-3 py-2 text-sm font-bold text-[#064ea4] hover:bg-blue-50"
+          title="Nueva venta"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Nueva venta
+        </button>
+      </div>
+
       <form ref={formRef} action={guardarVentaAction} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
         <input type="hidden" name="sucursalId" value={sucursalId} />
         <input type="hidden" name="cajaId" value={cajaActiva?.id ?? ""} />
@@ -322,7 +466,9 @@ export function VentasNuevaClient({
                 <input
                   className="sagva-field"
                   value={cliente}
-                  onChange={(event) => setCliente(event.target.value)}
+                  onChange={(event) =>
+                    actualizarVentaActiva((venta) => ({ ...venta, cliente: event.target.value }))
+                  }
                   placeholder="Cliente general o RUT/RUC"
                 />
               </div>
@@ -491,7 +637,9 @@ export function VentasNuevaClient({
             <textarea
               className="sagva-field mt-3 min-h-20"
               value={observacion}
-              onChange={(event) => setObservacion(event.target.value)}
+              onChange={(event) =>
+                actualizarVentaActiva((venta) => ({ ...venta, observacion: event.target.value }))
+              }
               placeholder="Observaciones internas de la venta"
             />
           </div>
@@ -609,10 +757,13 @@ export function VentasNuevaClient({
                   onChange={(event) => {
                     const value = Number(event.target.value);
                     if (!Number.isFinite(value)) {
-                      setMontoPago("");
+                      actualizarVentaActiva((venta) => ({ ...venta, montoPago: "" }));
                       return;
                     }
-                    setMontoPago(String(Math.min(Math.max(value, 0), saldoPendiente)));
+                    actualizarVentaActiva((venta) => ({
+                      ...venta,
+                      montoPago: String(Math.min(Math.max(value, 0), saldoPendiente)),
+                    }));
                   }}
                   placeholder={String(saldoPendiente || total || 0)}
                   disabled={!puedeAgregarPago}
@@ -682,7 +833,7 @@ export function VentasNuevaClient({
             </button>
             <button
               type="button"
-              onClick={limpiarVenta}
+              onClick={() => cerrarVentaTemporal(ventaActiva.id)}
               className="rounded-md border border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-50"
             >
               Anular pestaña
