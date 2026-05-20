@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { deleteRoleAction, updateRoleAction } from "@/app/actions/roles-permisos.actions";
 
 type RoleRow = {
@@ -17,6 +17,15 @@ type RolesTableProps = {
 
 export function RolesTable({ roles }: RolesTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingRoleId, setPendingRoleId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!isPending && pendingRoleId) {
+      setEditingId(null);
+      setPendingRoleId(null);
+    }
+  }, [isPending, pendingRoleId]);
 
   return (
     <div className="sagva-panel overflow-hidden">
@@ -41,19 +50,28 @@ export function RolesTable({ roles }: RolesTableProps) {
           <tbody className="divide-y divide-[#edf1f7]">
             {roles.map((rol) => {
               const isEditing = editingId === rol.id;
-              const updateAction = updateRoleAction.bind(null, rol.id);
+              const isSaving = isPending && pendingRoleId === rol.id;
               const deleteAction = deleteRoleAction.bind(null, rol.id);
               const canDelete = rol.usuarios === 0;
 
               return (
                 <tr key={rol.id} className="bg-white align-top">
                   <td className="px-4 py-3">
-                    <form id={`update-role-${rol.id}`} action={updateAction} className="contents">
+                    <form
+                      id={`update-role-${rol.id}`}
+                      action={(formData) => {
+                        setPendingRoleId(rol.id);
+                        startTransition(async () => {
+                          await updateRoleAction(rol.id, formData);
+                        });
+                      }}
+                      className="contents"
+                    >
                       <input
                         name="codigo"
                         defaultValue={rol.codigo}
                         required
-                        disabled={!isEditing}
+                        disabled={!isEditing || isSaving}
                         className="w-full rounded-md border border-[#d8dee8] px-3 py-2 font-semibold text-slate-900 disabled:border-transparent disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </form>
@@ -64,7 +82,7 @@ export function RolesTable({ roles }: RolesTableProps) {
                       name="nombre"
                       defaultValue={rol.nombre}
                       required
-                      disabled={!isEditing}
+                      disabled={!isEditing || isSaving}
                       className="w-full rounded-md border border-[#d8dee8] px-3 py-2 text-slate-700 disabled:border-transparent disabled:bg-slate-50 disabled:text-slate-500"
                     />
                   </td>
@@ -76,15 +94,17 @@ export function RolesTable({ roles }: RolesTableProps) {
                         <>
                           <button
                             form={`update-role-${rol.id}`}
-                            className="rounded-md bg-[#064ea4] px-3 py-2 text-xs font-bold text-white hover:bg-[#043d82]"
+                            disabled={isSaving}
+                            className="rounded-md bg-[#064ea4] px-3 py-2 text-xs font-bold text-white hover:bg-[#043d82] disabled:cursor-not-allowed disabled:bg-slate-300"
                             type="submit"
                           >
-                            Guardar
+                            {isSaving ? "Guardando" : "Guardar"}
                           </button>
                           <button
                             type="button"
+                            disabled={isSaving}
                             onClick={() => setEditingId(null)}
-                            className="rounded-md border border-[#d8dee8] px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                            className="rounded-md border border-[#d8dee8] px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                           >
                             Cancelar
                           </button>
