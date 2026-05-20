@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { moduleSensitiveFields, permissionActions } from "@/config/permissions.config";
 import { prisma } from "@/lib/prisma";
 import { optionalStringValue, stringValue } from "@/lib/form-utils";
 
@@ -87,4 +88,49 @@ export async function savePermissionAction(formData: FormData) {
   revalidatePath("/seguridad");
   revalidatePath("/seguridad/permisos");
   revalidatePath("/seguridad/auditoria");
+}
+
+export async function savePermissionMatrixAction(formData: FormData) {
+  const rolId = stringValue(formData, "rolId");
+  const modulo = stringValue(formData, "modulo") as keyof typeof moduleSensitiveFields;
+
+  if (!rolId || !modulo || !(modulo in moduleSensitiveFields)) {
+    redirect("/seguridad/permisos?error=campos");
+  }
+
+  const fields = ["__module__", ...moduleSensitiveFields[modulo]];
+  const before = await prisma.permiso.findMany({ where: { rolId, modulo } });
+
+  await prisma.$transaction(async (tx) => {
+    for (const campoKey of fields) {
+      const campo = campoKey === "__module__" ? null : campoKey;
+
+      for (const accion of permissionActions) {
+        const permitido = formData.get(`permiso:${campoKey}:${accion}`) === "on";
+
+        await tx.permiso.upsert({
+          where: { rolId_modulo_accion_campo: { rolId, modulo, accion, campo } },
+          update: { permitido },
+          create: { rolId, modulo, accion, campo, permitido }
+        });
+      }
+    }
+
+    await tx.auditoria.create({
+      data: {
+        modulo: "seguridad",
+        accion: "guardar_matriz_permisos",
+        entidad: "Permiso",
+        entidadId: rolId,
+        datoAnterior: JSON.stringify(before.map((item) => ({ accion: item.accion, campo: item.campo, permitido: item.permitido }))),
+        datoNuevo: JSON.stringify({ rolId, modulo, campos: fields.length, acciones: permissionActions.length }),
+        motivo: "Actualizacion matricial de permisos"
+      }
+    });
+  });
+
+  revalidatePath("/seguridad");
+  revalidatePath("/seguridad/permisos");
+  revalidatePath("/seguridad/auditoria");
+  redirect(`/seguridad/permisos?rolId=${rolId}&modulo=${modulo}`);
 }
