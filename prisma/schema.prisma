@@ -335,7 +335,6 @@ model VentaPago {
   venta      Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   metodoPago String   @map("metodo_pago")
   monto      Decimal
-  referencia String?
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("venta_pagos")
