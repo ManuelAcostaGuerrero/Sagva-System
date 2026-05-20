@@ -71,6 +71,8 @@ export async function guardarVentaAction(formData: FormData) {
   const cajaId = stringValue(formData, "cajaId");
   const clienteNombre = stringValue(formData, "cliente");
   const observacion = stringValue(formData, "observacion");
+  const quickMetodo = stringValue(formData, "quickMetodo").toLowerCase();
+  const efectivoRecibido = Number(stringValue(formData, "efectivoRecibido") || 0);
   const lineas = jsonValue<LineaVentaInput[]>(formData, "lineas", []);
   const pagos = jsonValue<PagoVentaInput[]>(formData, "pagos", []);
 
@@ -106,7 +108,9 @@ export async function guardarVentaAction(formData: FormData) {
     };
   });
 
-  const pagosValidos = pagos
+  const total = toMoney(lineasValidas.reduce((sum, linea) => sum + linea.totalLinea, 0));
+
+  let pagosValidos = pagos
     .map((pago) => ({
       metodo: String(pago.metodo || "EFECTIVO").toLowerCase(),
       monto: Number(pago.monto),
@@ -114,7 +118,30 @@ export async function guardarVentaAction(formData: FormData) {
     }))
     .filter((pago) => Number.isFinite(pago.monto) && pago.monto > 0);
 
-  const total = toMoney(lineasValidas.reduce((sum, linea) => sum + linea.totalLinea, 0));
+  if (accion === "cobrar" && quickMetodo) {
+    if (quickMetodo === "efectivo") {
+      if (!Number.isFinite(efectivoRecibido) || efectivoRecibido < total) {
+        redirect("/venta/nueva?error=efectivo_insuficiente");
+      }
+
+      pagosValidos = [
+        {
+          metodo: "efectivo",
+          monto: toMoney(efectivoRecibido),
+          referencia: "Pago rápido F2",
+        },
+      ];
+    } else {
+      pagosValidos = [
+        {
+          metodo: quickMetodo,
+          monto: total,
+          referencia: "Pago rápido",
+        },
+      ];
+    }
+  }
+
   const totalPagado = toMoney(pagosValidos.reduce((sum, pago) => sum + pago.monto, 0));
   const saldoPendiente = toMoney(Math.max(total - totalPagado, 0));
   const vuelto = toMoney(Math.max(totalPagado - total, 0));
@@ -248,8 +275,7 @@ export async function guardarVentaAction(formData: FormData) {
   revalidatePath("/caja");
 
   if (accion === "cobrar") {
-    const pagoEfectivo = pagosValidos.length === 1 && pagosValidos[0]?.metodo === "efectivo";
-    if (pagoEfectivo) {
+    if (pagosValidos.length === 1 && pagosValidos[0]?.metodo === "efectivo") {
       redirect(`/venta/nueva?success=cobrada&pago=${totalPagado}&vuelto=${vuelto}`);
     }
     redirect("/venta/nueva?success=cobrada");
