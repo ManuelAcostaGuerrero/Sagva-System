@@ -247,5 +247,13 @@ export async function guardarVentaAction(formData: FormData) {
   revalidatePath("/inventario");
   revalidatePath("/caja");
 
-  redirect(accion === "cobrar" ? "/venta/nueva?success=cobrada" : "/venta/abiertas?success=pendiente");
+  if (accion === "cobrar") {
+    const pagoEfectivo = pagosValidos.length === 1 && pagosValidos[0]?.metodo === "efectivo";
+    if (pagoEfectivo) {
+      redirect(`/venta/nueva?success=cobrada&pago=${totalPagado}&vuelto=${vuelto}`);
+    }
+    redirect("/venta/nueva?success=cobrada");
+  }
+
+  redirect("/venta/abiertas?success=pendiente");
 }
