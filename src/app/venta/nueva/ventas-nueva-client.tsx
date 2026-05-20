@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CreditCard, Plus, Search, Trash2 } from "lucide-react";
+import { CreditCard, Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { guardarVentaAction } from "./actions";
 
@@ -342,21 +342,15 @@ export function VentasNuevaClient({
           </div>
 
           <div className="sagva-panel overflow-visible">
-            <div className="sagva-panel-title flex items-center justify-between gap-3">
-              <span>Producto</span>
-              <span className="text-xs font-semibold text-slate-500">
-                Busca por nombre, código interno o código de barra
-              </span>
-            </div>
+            <div className="sagva-panel-title">Producto</div>
             <div className="p-4">
               <label className="sagva-label">Nombre o código del producto</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
-                  className="sagva-field pl-9"
+                  className="sagva-field"
                   value={busqueda}
                   onChange={(event) => setBusqueda(event.target.value)}
-                  placeholder="Escribe para desplegar productos..."
+                  placeholder="Escribe el producto"
                 />
 
                 {busqueda.trim() ? (
