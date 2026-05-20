@@ -8,20 +8,29 @@ export const dynamic = "force-dynamic";
 export default async function SeguridadPermisosPage() {
   const [roles, permisos] = await Promise.all([
     prisma.rol.findMany({ orderBy: { nombre: "asc" } }),
-    prisma.permiso.findMany({ include: { rol: true }, orderBy: [{ modulo: "asc" }, { accion: "asc" }] })
+    prisma.permiso.findMany({ include: { rol: true }, orderBy: [{ modulo: "asc" }, { accion: "asc" }, { campo: "asc" }] })
   ]);
 
   return (
-    <AppShell title="Permisos" subtitle="Control por modulo, accion y campo sensible real">
+    <AppShell title="Permisos" subtitle="Matriz de permisos por rol, modulo, campo y accion">
       <section className="space-y-6">
         <SecurityNav />
 
-        <PermissionForm roles={roles.map((rol) => ({ id: rol.id, nombre: rol.nombre }))} />
+        <PermissionForm
+          roles={roles.map((rol) => ({ id: rol.id, nombre: rol.nombre }))}
+          existingPermissions={permisos.map((permiso) => ({
+            rolId: permiso.rolId,
+            modulo: permiso.modulo,
+            accion: permiso.accion,
+            campo: permiso.campo,
+            permitido: permiso.permitido
+          }))}
+        />
 
         <div className="sagva-panel overflow-hidden">
           <div className="border-b border-[#d8dee8] p-5">
-            <h2 className="text-lg font-bold text-slate-950">Matriz de permisos</h2>
-            <p className="mt-1 text-sm text-slate-500">Permisos configurados para roles, modulos, acciones y campos sensibles.</p>
+            <h2 className="text-lg font-bold text-slate-950">Resumen de permisos guardados</h2>
+            <p className="mt-1 text-sm text-slate-500">Vista de control de las reglas existentes en la base de datos.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-left text-sm">
@@ -29,7 +38,7 @@ export default async function SeguridadPermisosPage() {
                 <tr><th className="px-4 py-3">Rol</th><th className="px-4 py-3">Modulo</th><th className="px-4 py-3">Accion</th><th className="px-4 py-3">Campo</th><th className="px-4 py-3">Estado</th></tr>
               </thead>
               <tbody className="divide-y divide-[#edf1f7]">
-                {permisos.map((permiso) => (
+                {permisos.slice(0, 120).map((permiso) => (
                   <tr key={permiso.id} className="bg-white">
                     <td className="px-4 py-3 font-semibold text-slate-900">{permiso.rol.nombre}</td>
                     <td className="px-4 py-3 text-slate-600">{permiso.modulo}</td>
