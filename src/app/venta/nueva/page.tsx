@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { CreditCard } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { prisma } from "@/lib/prisma";
 import { VentasNuevaClient } from "./ventas-nueva-client";
@@ -81,6 +83,12 @@ export default async function NuevaVentaPage({ searchParams }: NuevaVentaPagePro
 
   return (
     <AppShell title="Nueva venta">
+      <div className="mb-4 flex justify-end">
+        <Link href="/caja" className="inline-flex items-center gap-2 sagva-button-secondary">
+          <CreditCard className="h-4 w-4" aria-hidden="true" />
+          Ir a caja
+        </Link>
+      </div>
       {!sucursal ? (
         <div className="sagva-panel p-6 text-sm text-slate-600">
           No existe una sucursal configurada. Crea una sucursal antes de vender.

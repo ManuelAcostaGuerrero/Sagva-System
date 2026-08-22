@@ -1,5 +1,6 @@
 import { CheckCircle2, Info, Plus, Save, Search, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { RutSiiValidator } from "@/components/forms/rut-sii-validator";
 
 export default function NuevaFacturaPage() {
   const productos = [
@@ -45,10 +46,7 @@ export default function NuevaFacturaPage() {
                 Al seleccionar el proveedor, se cargarán automáticamente sus datos.
               </p>
             </label>
-            <label>
-              <span className="sagva-label">RUC</span>
-              <input className="sagva-field" defaultValue="20123456789" />
-            </label>
+            <RutSiiValidator defaultValue="20123456789" />
             <label>
               <span className="sagva-label">Razón Social</span>
               <input className="sagva-field" defaultValue="DISTRIBUIDORA LA UNIÓN SAC" />
