@@ -32,7 +32,7 @@ export default async function ProveedoresPage() {
                 <tr>
                   <th>Código</th>
                   <th>Razón social</th>
-                  <th>RUT/RUC</th>
+                  <th>RUT</th>
                   <th>Teléfono</th>
                   <th>Correo</th>
                   <th>Contacto</th>
@@ -45,7 +45,7 @@ export default async function ProveedoresPage() {
                   <tr key={proveedor.id}>
                     <td className="font-semibold text-slate-900">{proveedor.codigo}</td>
                     <td>{proveedor.razonSocial}</td>
-                    <td>{proveedor.rutRuc}</td>
+                    <td>{proveedor.rut}</td>
                     <td>{proveedor.telefono ?? "-"}</td>
                     <td>{proveedor.correo ?? "-"}</td>
                     <td>{proveedor.contacto ?? "-"}</td>

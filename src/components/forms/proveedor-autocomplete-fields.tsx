@@ -47,7 +47,7 @@ const estadoIconos = {
 };
 
 export function ProveedorAutocompleteFields() {
-  const [rutRuc, setRutRuc] = useState("");
+  const [rut, setRut] = useState("");
   const [razonSocial, setRazonSocial] = useState("");
   const [consultando, setConsultando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoConsulta | null>(null);
@@ -60,7 +60,7 @@ export function ProveedorAutocompleteFields() {
       const respuesta = await fetch("/api/proveedores/validar-rut", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rut: rutRuc })
+        body: JSON.stringify({ rut })
       });
       const datos = await respuesta.json() as ResultadoConsulta;
 
@@ -91,13 +91,13 @@ export function ProveedorAutocompleteFields() {
       </label>
 
       <label>
-        <span className="sagva-label">RUT/RUC *</span>
+        <span className="sagva-label">RUT *</span>
         <div className="flex gap-2">
           <input
-            name="rutRuc"
+            name="rut"
             className="sagva-field min-w-0"
-            value={rutRuc}
-            onChange={(event) => setRutRuc(event.target.value)}
+            value={rut}
+            onChange={(event) => setRut(event.target.value)}
             placeholder="Ej: 12.345.678-9"
             required
           />

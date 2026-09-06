@@ -64,7 +64,7 @@ async function main() {
   await prisma.proveedor.upsert({
     where: { codigo: "PROV001" },
     update: {
-      rutRuc: "20123456789",
+      rut: "20123456789",
       razonSocial: "DISTRIBUIDORA LA UNIÓN SAC",
       telefono: "987 654 321",
       correo: "ventas@launion.com",
@@ -72,7 +72,7 @@ async function main() {
     },
     create: {
       codigo: "PROV001",
-      rutRuc: "20123456789",
+      rut: "20123456789",
       razonSocial: "DISTRIBUIDORA LA UNIÓN SAC",
       nombreComercial: "La Unión",
       direccion: "Av. Los Próceres 1234",

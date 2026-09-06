@@ -71,7 +71,7 @@ export const moduleSensitiveFields = {
   ],
   proveedores: [
     "codigo_proveedor",
-    "rut_ruc",
+    "rut",
     "razon_social",
     "nombre_comercial",
     "direccion",

@@ -206,7 +206,7 @@ model InventarioMovimiento {
 model Proveedor {
   id                         String                       @id @default(cuid())
   codigo                     String                       @unique
-  rutRuc                     String                       @map("rut_ruc")
+  rut                        String
   razonSocial                String                       @map("razon_social")
   nombreComercial            String?                      @map("nombre_comercial")
   direccion                  String?

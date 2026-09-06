@@ -6,7 +6,7 @@ export const ProveedorService = {
     return prisma.proveedor.create({
       data: {
         codigo: datos.codigo,
-        rutRuc: datos.rutRuc,
+        rut: datos.rut,
         razonSocial: datos.razonSocial,
         nombreComercial: datos.nombreComercial,
         direccion: datos.direccion,

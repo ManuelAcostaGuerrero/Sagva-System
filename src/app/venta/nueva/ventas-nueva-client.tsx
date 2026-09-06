@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CreditCard, Plus, Trash2, X } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
@@ -469,58 +470,64 @@ export function VentasNuevaClient({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        {ventas.length > 1
-          ? ventas.map((venta) => {
-              const ventaTotal = totalVenta(venta.lineas);
-              const activa = venta.id === ventaActivaId;
-              return (
-                <button
-                  key={venta.id}
-                  type="button"
-                  onClick={() => setVentaActivaId(venta.id)}
-                  className={`flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-bold ${
-                    activa
-                      ? "border-[#064ea4] bg-blue-50 text-[#064ea4]"
-                      : "border-[#d8dee8] bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  <span>Venta {venta.numero}</span>
-                  {venta.lineas.length > 0 ? (
-                    <span className="text-xs font-semibold text-slate-500">{money(ventaTotal)}</span>
-                  ) : null}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      cerrarVentaTemporal(venta.id);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {ventas.length > 1
+            ? ventas.map((venta) => {
+                const ventaTotal = totalVenta(venta.lineas);
+                const activa = venta.id === ventaActivaId;
+                return (
+                  <button
+                    key={venta.id}
+                    type="button"
+                    onClick={() => setVentaActivaId(venta.id)}
+                    className={`flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-bold ${
+                      activa
+                        ? "border-[#064ea4] bg-blue-50 text-[#064ea4]"
+                        : "border-[#d8dee8] bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>Venta {venta.numero}</span>
+                    {venta.lineas.length > 0 ? (
+                      <span className="text-xs font-semibold text-slate-500">{money(ventaTotal)}</span>
+                    ) : null}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(event) => {
                         event.stopPropagation();
                         cerrarVentaTemporal(venta.id);
-                      }
-                    }}
-                    className="rounded-full p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                    title="Cerrar venta"
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                  </span>
-                </button>
-              );
-            })
-          : null}
-        <button
-          type="button"
-          onClick={crearNuevaInstanciaVenta}
-          className="inline-flex items-center gap-2 rounded-full border border-dashed border-[#064ea4] bg-white px-3 py-2 text-sm font-bold text-[#064ea4] hover:bg-blue-50"
-          title="Nueva venta"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Nueva venta
-        </button>
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          cerrarVentaTemporal(venta.id);
+                        }
+                      }}
+                      className="rounded-full p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      title="Cerrar venta"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </span>
+                  </button>
+                );
+              })
+            : null}
+          <button
+            type="button"
+            onClick={crearNuevaInstanciaVenta}
+            className="inline-flex items-center gap-2 rounded-full border border-dashed border-[#064ea4] bg-white px-3 py-2 text-sm font-bold text-[#064ea4] hover:bg-blue-50"
+            title="Nueva venta"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Nueva venta
+          </button>
+        </div>
+        <Link href="/caja" className="inline-flex items-center gap-2 sagva-button-secondary">
+          <CreditCard className="h-4 w-4" aria-hidden="true" />
+          Ir a caja
+        </Link>
       </div>
 
       <form ref={formRef} action={guardarVentaAction} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
@@ -542,7 +549,7 @@ export function VentasNuevaClient({
                   className="sagva-field"
                   value={cliente}
                   onChange={(event) => actualizarVentaActiva((venta) => ({ ...venta, cliente: event.target.value }))}
-                  placeholder="Cliente general o RUT/RUC"
+                  placeholder="Cliente general o RUT"
                 />
               </div>
               <div>

@@ -84,7 +84,7 @@ export function RutSiiValidator({ defaultValue }: { defaultValue: string }) {
         <span className="sagva-label">RUT</span>
         <div className="flex gap-2">
           <input
-            name="rutRuc"
+            name="rut"
             className="sagva-field min-w-0"
             value={rut}
             onChange={(event) => setRut(event.target.value)}

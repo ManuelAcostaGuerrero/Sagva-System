@@ -7,17 +7,17 @@ import { optionalStringValue, stringValue } from "@/lib/form-utils";
 
 export async function crearProveedorAction(formData: FormData) {
   const codigo = stringValue(formData, "codigo");
-  const rutRuc = stringValue(formData, "rutRuc");
+  const rut = stringValue(formData, "rut");
   const razonSocial = stringValue(formData, "razonSocial");
 
-  if (!codigo || !rutRuc || !razonSocial) {
+  if (!codigo || !rut || !razonSocial) {
     redirect("/proveedores/nuevo?error=campos");
   }
 
   await prisma.proveedor.create({
     data: {
       codigo,
-      rutRuc,
+      rut,
       razonSocial,
       nombreComercial: optionalStringValue(formData, "nombreComercial"),
       direccion: optionalStringValue(formData, "direccion"),
