@@ -116,28 +116,28 @@ export async function AppShell({
       </aside>
 
       <main className="min-w-0 bg-[#f5f7fb]">
-        <header className="border-b border-[#d8dee8] bg-white px-5 py-5 lg:px-8">
+        <header className="border-b border-red-700 bg-red-600 px-5 py-5 text-white lg:px-8">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-slate-950">{title}</h1>
-              {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
+              <h1 className="text-2xl font-bold text-white">{title}</h1>
+              {subtitle ? <p className="mt-1 text-sm text-white/80">{subtitle}</p> : null}
             </div>
             <div className="flex items-center gap-4">
-              <CircleHelp className="h-5 w-5 text-slate-500" aria-hidden="true" />
+              <CircleHelp className="h-5 w-5 text-white/90" aria-hidden="true" />
               <div className="flex items-center gap-2">
-                <UserCircle className="h-8 w-8 text-slate-700" aria-hidden="true" />
+                <UserCircle className="h-8 w-8 text-white" aria-hidden="true" />
                 <div className="hidden text-right sm:block">
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-sm font-semibold text-white">
                     {user?.nombre ?? "Usuario"}
                   </p>
-                  <p className="text-xs text-slate-500">{user?.rol?.nombre ?? "Sin sesión"}</p>
+                  <p className="text-xs text-white/80">{user?.rol?.nombre ?? "Sin sesión"}</p>
                 </div>
-                <ChevronDown className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                <ChevronDown className="h-4 w-4 text-white/90" aria-hidden="true" />
               </div>
               {user ? (
                 <form action={logoutAction}>
                   <button
-                    className="rounded-md border border-[#d8dee8] p-2 text-slate-600 hover:bg-slate-50"
+                    className="rounded-md border border-white/40 p-2 text-white hover:bg-red-700"
                     title="Cerrar sesión"
                   >
                     <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -146,7 +146,7 @@ export async function AppShell({
               ) : (
                 <Link
                   href="/login"
-                  className="rounded-md border border-[#d8dee8] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  className="rounded-md border border-white/40 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
                 >
                   Login
                 </Link>
