@@ -22,7 +22,7 @@ export default async function DashboardPage() {
   ).length;
 
   return (
-    <AppShell title="Inicio" subtitle="Resumen operativo de Sagva System">
+    <AppShell title="Inicio" subtitle="Resumen operativo de Sag Assistant · Módulo ventas">
       <section className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Artículos" value={String(articulos)} helper="Productos registrados" />

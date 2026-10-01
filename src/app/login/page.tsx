@@ -1,4 +1,5 @@
-import { LockKeyhole, Package } from "lucide-react";
+import { Brand } from "@/components/layout/brand";
+import { LockKeyhole } from "lucide-react";
 import { loginAction } from "@/app/actions/auth.actions";
 
 export default async function LoginPage({
@@ -12,15 +13,7 @@ export default async function LoginPage({
   return (
     <main className="grid min-h-screen bg-[#f5f7fb] lg:grid-cols-[460px_1fr]">
       <section className="flex min-h-screen flex-col justify-between bg-[#001a33] px-10 py-8 text-white">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-md border border-white/40">
-            <Package className="h-7 w-7" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-3xl font-bold tracking-wide">SAGVA</p>
-            <p className="text-xs font-semibold tracking-[0.35em] text-white/80">SYSTEM</p>
-          </div>
-        </div>
+        <Brand />
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-200">
             Gestión comercial
@@ -33,7 +26,7 @@ export default async function LoginPage({
             stock, caja y reportes operativos.
           </p>
         </div>
-        <p className="text-xs text-white/45">Sagva System - entorno local</p>
+        <p className="text-xs text-white/45">Sag Assistant · Módulo ventas · Entorno local</p>
       </section>
 
       <section className="flex items-center justify-center px-6 py-10">

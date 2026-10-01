@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Brand } from "@/components/layout/brand";
 import { useState } from "react";
 import {
   BarChart3,
@@ -85,13 +86,7 @@ export function MobileNav() {
           <aside className="relative z-10 h-full w-[86%] max-w-[320px] overflow-y-auto bg-[#001a33] text-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
               <Link href="/dashboard" onClick={() => setAbierto(false)} className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/40">
-                  <Package className="h-6 w-6" aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="text-xl font-bold tracking-wide">SAGVA</p>
-                  <p className="text-[10px] font-semibold tracking-[0.35em] text-white/70">SYSTEM</p>
-                </div>
+                <Brand />
               </Link>
 
               <button

@@ -7,7 +7,7 @@ export default function NotFoundPage() {
         <p className="text-sm font-bold uppercase tracking-wide text-[#064ea4]">Error 404</p>
         <h1 className="mt-3 text-3xl font-bold text-slate-950">Pagina no encontrada</h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          La ruta que intentaste abrir no existe o todavia no tiene una pantalla creada en Sagva System.
+          La ruta que intentaste abrir no existe o todavia no tiene una pantalla creada en Sag Assistant · Módulo ventas.
           Revisa la direccion o vuelve al panel principal.
         </p>
         <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">

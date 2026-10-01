@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Brand } from "@/components/layout/brand";
 import {
   BarChart3,
   Boxes,
@@ -68,7 +69,7 @@ const navGroups = [
 
 export async function AppShell({
   children,
-  title = "Sagva System",
+  title = "Sag Assistant · Módulo ventas",
   subtitle
 }: AppShellProps) {
   const user = await getCurrentUser();
@@ -78,15 +79,7 @@ export async function AppShell({
       <aside className="hidden bg-[#001a33] text-white lg:block lg:min-h-screen">
         <div className="px-6 py-6">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/40">
-              <Package className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tracking-wide">SAGVA</p>
-              <p className="text-xs font-semibold tracking-[0.35em] text-white/80">
-                SYSTEM
-              </p>
-            </div>
+            <Brand />
           </Link>
         </div>
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sagva System",
+  title: "Sag Assistant · Módulo ventas",
   description: "Sistema Automatizado de Gestión de Ventas y Análisis"
 };
 
