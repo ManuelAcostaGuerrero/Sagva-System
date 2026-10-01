@@ -94,6 +94,12 @@ npm run db:seed
 npm run dev
 ```
 
+Para trabajar localmente en el puerto 3000 (acceso solo desde este computador):
+
+```bash
+npm run dev:local
+```
+
 La aplicación queda disponible en:
 
 ```text
