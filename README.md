@@ -30,6 +30,7 @@ Archivos principales:
 
 - [`docs/00-blueprint-maestro.md`](docs/00-blueprint-maestro.md)
 - [`docs/01-fase-aplicacion-armable.md`](docs/01-fase-aplicacion-armable.md)
+- [`docs/actualizacion-local-windows.md`](docs/actualizacion-local-windows.md)
 
 ## Fases del proyecto
 
@@ -105,6 +106,24 @@ Usuario inicial:
 admin@sagva.local
 admin123
 ```
+
+## Actualización manual en Windows
+
+Las instalaciones locales de Sagva System se actualizan de forma manual y controlada desde GitHub. No se utiliza actualización automática en segundo plano.
+
+Para aplicar cambios nuevos:
+
+1. Cerrar Sagva System.
+2. Ejecutar `ACTUALIZAR_SAGVA.bat` desde la carpeta local del proyecto.
+3. El actualizador revisa que no existan cambios locales sin guardar.
+4. Si existe una nueva versión, crea un respaldo de `.env` y de la base SQLite local.
+5. Descarga `main` desde GitHub con `git pull --ff-only`.
+6. Actualiza dependencias y Prisma.
+7. Actualiza el esquema con `prisma db push` sin permitir pérdida automática de datos.
+8. No ejecuta el seed automáticamente.
+9. Al finalizar, ejecutar `INICIAR_SAGVA.bat`.
+
+El procedimiento completo está documentado en [`docs/actualizacion-local-windows.md`](docs/actualizacion-local-windows.md).
 
 ## Módulos funcionales actuales
 
