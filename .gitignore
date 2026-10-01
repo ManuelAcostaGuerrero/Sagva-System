@@ -19,6 +19,9 @@ dist
 prisma/dev.db
 prisma/dev.db-journal
 
+# local updater backups
+backups/
+
 # system
 .DS_Store
 Thumbs.db
