@@ -11,7 +11,7 @@ function Run([string]$Command,[string[]]$Arguments){ & $Command @Arguments; if($
 function Git([string[]]$Arguments){$out=@(& git.exe @Arguments);if($LASTEXITCODE -ne 0){throw 'No se pudo verificar Git.'};return ($out -join "`n").Trim()}
 function Hash([string]$File){$s=[IO.File]::OpenRead($File);$h=[Security.Cryptography.SHA256]::Create();try{return ([BitConverter]::ToString($h.ComputeHash($s))).Replace('-','')}finally{$h.Dispose();$s.Dispose()}}
 function Own { @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object {$_.CommandLine -and $_.CommandLine.Contains($root+'\node_modules\') -and $_.CommandLine.Contains('next')}) }
-function StopOwn { foreach($entry in @(Own)){$p=Get-CimInstance Win32_Process -Filter "ProcessId=$($entry.ProcessId)";if($p -and $p.CreationDate -eq $entry.CreationDate -and $p.CommandLine.Contains($root+'\node_modules\') -and $p.CommandLine.Contains('next')){Write-Host "Deteniendo solo Sagva System PID $($p.ProcessId)";Stop-Process -Id $p.ProcessId -ErrorAction Stop}} }
+function StopOwn { foreach($entry in @(Own)){$p=Get-CimInstance Win32_Process -Filter "ProcessId=$($entry.ProcessId)";if($p -and $p.CommandLine -and $p.CreationDate -eq $entry.CreationDate -and $p.CommandLine.Contains($root+'\node_modules\') -and $p.CommandLine.Contains('next')){Write-Host "Deteniendo solo Sagva System PID $($p.ProcessId)";Stop-Process -Id $p.ProcessId -ErrorAction Stop}} }
 function State { $script:state | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $statePath -Encoding UTF8 }
 try{
  $locked=$mutex.WaitOne(0);if(!$locked){throw 'Otra actualización está en curso.'}
@@ -45,6 +45,7 @@ try{
   Run npm.cmd @('ci','--no-audit')
   Run npm.cmd @('run','prisma:generate')
   Run node.exe @('tools/test-local-update-db.mjs')
+  Run powershell.exe @('-NoProfile','-ExecutionPolicy','Bypass','-File','tools/test-process-identity.ps1')
   Run node.exe @('--input-type=module','-e',"import {DatabaseSync} from 'node:sqlite';new DatabaseSync('prisma/ensayo-actualizacion.db').close();")
   Run npm.cmd @('run','db:push')
   Run npm.cmd @('run','lint')
