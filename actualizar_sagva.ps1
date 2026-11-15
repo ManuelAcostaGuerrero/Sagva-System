@@ -33,7 +33,10 @@ try{
  if(!(Test-Path '.env')){throw 'Falta configuración privada .env.'}
  $resume=$own.Count -gt 0
  $script:state=@{Before=$before;Target=$target;Stage='preparando';RecoveryRequired=$false;Result='en_curso';WasRunning=$resume};State
- $stage=Join-Path $local ('preparacion-'+[guid]::NewGuid().ToString('N'))
+ # Fuera del proyecto: Next no debe resolver ESLint/dependencias del padre parcialmente instalado.
+ $preparations=Join-Path (Split-Path $root -Parent) 'Archivo-SAGVA/actualizaciones-system'
+ New-Item -ItemType Directory -Force -Path $preparations | Out-Null
+ $stage=Join-Path $preparations ([guid]::NewGuid().ToString('N'))
  Run git.exe @('worktree','add','--detach',$stage,$target)
  Push-Location -LiteralPath $stage
  $oldUrl=$env:DATABASE_URL
