@@ -13,6 +13,7 @@ import {
   Layers3,
   Menu,
   Package,
+  ScanLine,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -30,7 +31,8 @@ const navGroups = [
     items: [
       { label: "Proveedores", href: "/proveedores", icon: Truck },
       { label: "Nueva Compra", href: "/facturas/nueva", icon: ShoppingCart },
-      { label: "Lista de Compras", href: "/facturas", icon: FileText }
+      { label: "Lista de Compras", href: "/facturas", icon: FileText },
+      { label: "Laboratorio DTE (pruebas)", href: "/laboratorio-dte", icon: ScanLine }
     ]
   },
   {
