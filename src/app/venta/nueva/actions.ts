@@ -252,6 +252,7 @@ export async function guardarVentaAction(formData: FormData) {
         data: {
           usuarioId: user.id,
           accion: accion === "cobrar" ? "VENTA_COBRADA" : "VENTA_PENDIENTE",
+          modulo: "ventas",
           entidad: "Venta",
           entidadId: venta.id,
           datoNuevo: JSON.stringify({ clienteNombre, observacion }),

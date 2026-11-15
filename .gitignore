@@ -34,3 +34,8 @@ pnpm-debug.log*
 
 # typescript
 tsconfig.tsbuildinfo
+
+.local/
+*.db-wal
+*.db-shm
+*.db-journal

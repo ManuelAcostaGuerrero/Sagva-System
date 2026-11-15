@@ -94,15 +94,16 @@ export async function savePermissionAction(formData: FormData) {
   const modulo = stringValue(formData, "modulo");
   const accion = stringValue(formData, "accion");
   const campoValue = stringValue(formData, "campo");
-  const campo = campoValue.length > 0 ? campoValue : undefined;
+  const campo = campoValue.length > 0 ? campoValue : null;
   const permitido = stringValue(formData, "permitido") === "true";
 
   if (!rolId || !modulo || !accion) redirect("/seguridad/permisos?error=campos");
 
-  const permiso = await prisma.permiso.upsert({
-    where: { rolId_modulo_accion_campo: { rolId, modulo, accion, campo } },
-    update: { permitido },
-    create: { rolId, modulo, accion, campo, permitido }
+  const permiso = await prisma.$transaction(async (tx) => {
+    const existing = await tx.permiso.findFirst({ where: { rolId, modulo, accion, campo } });
+    return existing
+      ? tx.permiso.update({ where: { id: existing.id }, data: { permitido } })
+      : tx.permiso.create({ data: { rolId, modulo, accion, campo, permitido } });
   });
 
   await prisma.auditoria.create({
@@ -139,11 +140,12 @@ export async function savePermissionMatrixAction(formData: FormData) {
       for (const accion of permissionActions) {
         const permitido = formData.get(`permiso:${campoKey}:${accion}`) === "on";
 
-        await tx.permiso.upsert({
-          where: { rolId_modulo_accion_campo: { rolId, modulo, accion, campo } },
-          update: { permitido },
-          create: { rolId, modulo, accion, campo, permitido }
-        });
+        const existing = await tx.permiso.findFirst({ where: { rolId, modulo, accion, campo } });
+        if (existing) {
+          await tx.permiso.update({ where: { id: existing.id }, data: { permitido } });
+        } else {
+          await tx.permiso.create({ data: { rolId, modulo, accion, campo, permitido } });
+        }
       }
     }
 
