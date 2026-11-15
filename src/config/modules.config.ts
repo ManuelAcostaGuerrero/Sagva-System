@@ -8,6 +8,7 @@ import {
   Layers3,
   Package,
   Settings,
+  ScanLine,
   ShieldCheck,
   ShoppingCart,
   Truck
@@ -22,6 +23,7 @@ export type SagvaModuleKey =
   | "ensamblaje"
   | "proveedores"
   | "facturas"
+  | "laboratorio_dte"
   | "analisis"
   | "seguridad"
   | "calendario"
@@ -82,6 +84,13 @@ export const modulesConfig = [
     label: "Facturas",
     href: "/facturas",
     icon: FileText,
+    area: "Compras"
+  },
+  {
+    key: "laboratorio_dte",
+    label: "Laboratorio DTE (pruebas)",
+    href: "/laboratorio-dte",
+    icon: ScanLine,
     area: "Compras"
   },
   {

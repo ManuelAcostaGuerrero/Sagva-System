@@ -21,6 +21,7 @@ export const routesConfig = {
     index: "/facturas",
     nueva: "/facturas/nueva"
   },
+  laboratorioDte: "/laboratorio-dte",
   venta: {
     nueva: "/venta/nueva",
     abiertas: "/venta/abiertas",
