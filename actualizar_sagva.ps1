@@ -31,7 +31,7 @@ try{
  $stamp=Join-Path $local 'installed.json'
  if($before -eq $target -and (Test-Path $stamp)){$installed=Get-Content $stamp -Raw | ConvertFrom-Json;if($installed.Commit -eq $target -and $installed.LockHash -eq (Hash 'package-lock.json') -and $installed.SchemaHash -eq (Hash 'prisma/schema.prisma') -and (Test-Path 'node_modules/.prisma/client/index.js')){Write-Host "Ya está actualizado: $target. Sin reinstalar ni reiniciar.";exit 0}}
  if(!(Test-Path '.env')){throw 'Falta configuración privada .env.'}
- $resume=$own.Count -gt 0
+ $resume=($own.Count -gt 0) -or ($previous -and $previous.ResumeAfterRecovery)
  $script:state=@{Before=$before;Target=$target;Stage='preparando';RecoveryRequired=$false;Result='en_curso';WasRunning=$resume};State
  # Fuera del proyecto: Next no debe resolver ESLint/dependencias del padre parcialmente instalado.
  $preparations=Join-Path (Split-Path $root -Parent) 'Archivo-SAGVA/actualizaciones-system'
