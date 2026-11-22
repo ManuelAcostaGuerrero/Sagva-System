@@ -15,3 +15,15 @@ export function calcularPrecioPublico(precioBase: number, margen = 0.3) {
 export function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
+
+/**
+ * Costo estimado de adquisición para venta minorista al consumidor final.
+ * La base neta no incluye ILA. No agregar el impuesto de nuevo a la boleta.
+ */
+export function calcularCostoConImpuestoAdicional(
+  precioConIVA: number,
+  precioSinIVA: number,
+  tasaIlaPorcentaje: number
+) {
+  return roundMoney(precioConIVA + precioSinIVA * tasaIlaPorcentaje / 100);
+}

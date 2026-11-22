@@ -1,5 +1,6 @@
 import type { Articulo, ArticuloPrecio, Familia, Marca, Proveedor, ProveedorProductoAsociado, Subfamilia } from "@prisma/client";
 import { Save } from "lucide-react";
+import { ArticuloPreciosImpuestos } from "@/components/forms/articulo-precios-impuestos";
 import { crearArticuloAction, actualizarArticuloAction } from "@/app/actions/articulos.actions";
 
 type ArticuloWithPrecio = Articulo & {
@@ -109,28 +110,6 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
               defaultValue={articulo?.cantidadEspecifica ?? ""}
             />
           </label>
-          <label>
-            <span className="sagva-label">Tipo impuesto</span>
-            <select
-              name="tipoImpuesto"
-              className="sagva-field"
-              defaultValue={articulo?.tipoImpuesto ?? "IVA"}
-            >
-              <option value="IVA">IVA</option>
-              <option value="exento">Exento</option>
-              <option value="impuesto_adicional">Impuesto adicional</option>
-            </select>
-          </label>
-          <label>
-            <span className="sagva-label">Impuesto adicional</span>
-            <input
-              name="impuestoAdicional"
-              type="number"
-              step="0.01"
-              className="sagva-field"
-              defaultValue={Number(articulo?.impuestoAdicional ?? 0)}
-            />
-          </label>
         </div>
       </section>
 
@@ -174,38 +153,19 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
       </section>
 
       <section className="sagva-panel">
-        <div className="sagva-panel-title">Precios e inventario</div>
+        <div className="sagva-panel-title">Impuestos y precios</div>
+        <ArticuloPreciosImpuestos
+          tipoImpuestoInicial={articulo?.tipoImpuesto ?? "IVA"}
+          impuestoAdicionalInicial={Number(articulo?.impuestoAdicional ?? 0)}
+          precioConIvaInicial={Number(precio?.precioConIva ?? 0)}
+          precioSinIvaInicial={Number(precio?.precioSinIva ?? 0)}
+          margenInicial={Number(precio?.margen ?? 0.3) * 100}
+        />
+      </section>
+
+      <section className="sagva-panel">
+        <div className="sagva-panel-title">Inventario y precios mayoristas</div>
         <div className="grid gap-4 p-4 md:grid-cols-4">
-          <label>
-            <span className="sagva-label">Precio con IVA</span>
-            <input
-              name="precioConIva"
-              type="number"
-              step="0.01"
-              className="sagva-field"
-              defaultValue={Number(precio?.precioConIva ?? 0)}
-            />
-          </label>
-          <label>
-            <span className="sagva-label">Precio sin IVA</span>
-            <input
-              name="precioSinIva"
-              type="number"
-              step="0.01"
-              className="sagva-field"
-              defaultValue={Number(precio?.precioSinIva ?? 0)}
-            />
-          </label>
-          <label>
-            <span className="sagva-label">Margen %</span>
-            <input
-              name="margen"
-              type="number"
-              step="0.01"
-              className="sagva-field"
-              defaultValue={Number(precio?.margen ?? 0.3) * 100}
-            />
-          </label>
           <label>
             <span className="sagva-label">Precio mayorista</span>
             <input

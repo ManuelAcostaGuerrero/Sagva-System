@@ -17,7 +17,8 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 - Familia y subfamilia.
 - Marca.
 - Tipo de impuesto.
-- Impuesto adicional.
+- Impuesto adicional ILA de bebidas seleccionable por categoría: 0%, 10%, 18%, 20,5% y 31,5%.
+- Precios con/sin IVA calculados automáticamente en pantalla y precio público sugerido visible.
 - Stock mínimo y máximo como referencia para inventario.
 - Unidad de medida y cantidad específica.
 - Comentario interno.
@@ -72,13 +73,17 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 
 1. Si se ingresa precio con IVA, calcular precio sin IVA.
 2. Si se ingresa precio sin IVA, calcular precio con IVA.
-3. Si se activa impuesto adicional, recalcular precios.
-4. Si cambia el margen, recalcular precio público.
-5. Al crear un artículo, generar un código `ART-` único. Conservar los códigos existentes.
-6. Mantener el código de barras independiente del código del proveedor.
-7. El código externo se identifica por proveedor + código (no es único globalmente).
-8. Permitir varios códigos externos asociados a un mismo artículo, sin duplicar el inventario.
-9. No reasignar a otro artículo un código externo ya asociado dentro del mismo proveedor.
+3. El catálogo de bebidas aplica ILA del 10% a bebidas analcohólicas/energéticas, 18% cuando tienen más de 15 g de azúcar por 240 ml, 20,5% a vinos/cervezas/sidras, 31,5% a licores/destilados, y 0% cuando no aplica (SII, DL 825 art. 42).
+4. IVA general: 19%. Exento: 0%. Mostrar el monto del IVA y del ILA estimado en compra, calculando el ILA sobre la base neta.
+5. Cambiar cualquiera de los campos de costo con IVA/sin IVA recalcula el otro; la última edición es la fuente para el guardado en servidor.
+6. El precio público sugerido se recalcula al cambiar costo, tipo de IVA, ILA o recargo de margen (recargo sobre costo, no margen sobre precio de venta).
+7. Para ventas minoristas al consumidor final, el ILA soportado en compra forma parte del costo y no se recarga nuevamente en la boleta; para mayoristas hay reglas especiales que requieren su propia configuración.
+8. Si el costo ingresado ya incluye el impuesto adicional, no aplicarlo una segunda vez; se requiere base de compra sin ILA.
+9. Al crear un artículo, generar un código `ART-` único. Conservar los códigos existentes.
+10. Mantener el código de barras independiente del código del proveedor.
+11. El código externo se identifica por proveedor + código (no es único globalmente).
+12. Permitir varios códigos externos asociados a un mismo artículo, sin duplicar el inventario.
+13. No reasignar a otro artículo un código externo ya asociado dentro del mismo proveedor.
 
 ## Integraciones
 
@@ -96,3 +101,5 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 - Definir estados finales del artículo.
 - Definir fórmula exacta para artículo exento + impuesto adicional.
 - Definir si precio público permite redondeo automático.
+- Validar las tasas y el tratamiento tributario de ventas mayoristas con contabilidad antes de automatizar facturas tributarias.
+- Fuente tributaria: https://www.sii.cl/preguntas_frecuentes/impuestos_mensuales/001_130_1250.htm y https://www.sii.cl/preguntas_frecuentes/impuestos_mensuales/001_130_1899.htm

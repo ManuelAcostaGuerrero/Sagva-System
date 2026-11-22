@@ -8,7 +8,8 @@ import { numberValue, optionalStringValue, stringValue } from "@/lib/form-utils"
 import {
   calcularPrecioConIVA,
   calcularPrecioPublico,
-  calcularPrecioSinIVA
+  calcularPrecioSinIVA,
+  calcularCostoConImpuestoAdicional
 } from "@/utils/calculations/prices";
 
 async function ensureSucursalPrincipal() {
@@ -54,17 +55,33 @@ function generarCodigoInterno() {
 function precioDataFromForm(formData: FormData) {
   const precioConIvaInput = numberValue(formData, "precioConIva", 0);
   const precioSinIvaInput = numberValue(formData, "precioSinIva", 0);
-  const margen = numberValue(formData, "margen", 30) / 100;
-  const precioSinIva =
-    precioSinIvaInput > 0 ? precioSinIvaInput : calcularPrecioSinIVA(precioConIvaInput);
-  const precioConIva =
-    precioConIvaInput > 0 ? precioConIvaInput : calcularPrecioConIVA(precioSinIva);
+  const margen = Math.max(0, numberValue(formData, "margen", 30)) / 100;
+  const tipoImpuesto = stringValue(formData, "tipoImpuesto") || "IVA";
+  const tasaAdicional = tipoImpuesto === "exento"
+    ? 0
+    : numberValue(formData, "impuestoAdicional", 0);
+  const ultimoEditado = stringValue(formData, "ultimoPrecioEditado");
+
+  // La edición más reciente manda: no ignorar un precio con IVA modificado.
+  const precioSinIva = tipoImpuesto === "exento"
+    ? (ultimoEditado === "sin" ? precioSinIvaInput : precioConIvaInput)
+    : ultimoEditado === "sin"
+      ? precioSinIvaInput
+      : calcularPrecioSinIVA(precioConIvaInput);
+  const precioConIva = tipoImpuesto === "exento"
+    ? precioSinIva
+    : ultimoEditado === "sin"
+      ? calcularPrecioConIVA(precioSinIva)
+      : precioConIvaInput;
 
   return {
     precioConIva,
     precioSinIva,
     margen,
-    precioPublico: calcularPrecioPublico(precioConIva, margen),
+    precioPublico: calcularPrecioPublico(
+      calcularCostoConImpuestoAdicional(precioConIva, precioSinIva, tasaAdicional),
+      margen
+    ),
     precioMayorista: numberValue(formData, "precioMayorista", 0),
     cantidadMinimaMayorista: numberValue(formData, "cantidadMinimaMayorista", 0)
   };
