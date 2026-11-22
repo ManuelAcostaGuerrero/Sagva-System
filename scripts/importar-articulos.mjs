@@ -3,6 +3,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { Prisma } from "@prisma/client";
 
 const args = process.argv.slice(2);
 const arg = (key, fallback) => args.find(x => x.startsWith("--" + key + "="))?.slice(key.length + 3) ?? fallback;
@@ -12,7 +13,7 @@ const sucursalCodigo = arg("sucursal", "principal");
 const comparable = v => String(v ?? "").normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase("es");
 const texto = v => typeof v === "string" ? v.trim() : "";
 const dinero = v => typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v) && Number.isFinite(Number(v)) && Math.abs(Number(v)) < 1e12 ? Number(v) : null;
-const redondear = n => Math.round((n + Number.EPSILON) * 100) / 100;
+const costoConIva = valor => new Prisma.Decimal(valor).mul("1.19").toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toNumber();
 
 function datosTributarios(r) {
   if (r.tipoOrigen === "PRODUCTO") return ["PRODUCTO", "IVA"];
@@ -37,10 +38,10 @@ function prevalidar(data) {
   const validos = [], pendientes = [], alertas = [];
   for (const r of data.registros) {
     const id = texto(r.idAnterior), barra = texto(r.codigoBarra);
-    const nombre = texto(r.nombre), familia = texto(r.familia);
+    const nombre = typeof r.nombre === "string" ? r.nombre : "", familia = texto(r.familia);
     const trib = datosTributarios(r);
     const costo = dinero(r.costoNeto), precio = dinero(r.precioPublico), stock = dinero(r.stock);
-    const bruto = costo !== null ? redondear(costo * 1.19) : null;
+    const bruto = costo !== null ? costoConIva(r.costoNeto) : null;
     const recargo = bruto !== null && bruto > 0 && precio !== null ? Number((precio / bruto - 1).toFixed(10)) : null;
     const motivos = [];
     if (!/^\d{1,15}$/.test(id)) motivos.push("ID antiguo no numérico o no confiable");
@@ -49,9 +50,11 @@ function prevalidar(data) {
     if (barra.length > 100) motivos.push("Código de barras demasiado largo");
     if (barra && (contarBarras.get(barra) || 0) > 1) motivos.push("Código de barras duplicado en Excel");
     if (!trib) motivos.push("Tipo EXENTOS fuera de CIGARROS/TABAQUERIA u otro tipo no autorizado");
-    if (!nombre) motivos.push("Nombre vacío");
+    if (!nombre.trim()) motivos.push("Nombre vacío");
     if (precio === null || precio <= 0) motivos.push("Precio público faltante o no positivo");
     if (costo === null || costo <= 0) motivos.push("Costo neto faltante o no positivo");
+    if (typeof r.costoNeto === "string" && (r.costoNeto.split(".")[1]?.length || 0) > 5) motivos.push("Costo neto con más de cinco decimales");
+    if (bruto !== null && bruto <= 0) motivos.push("Costo con IVA redondeado a cero");
     if (stock === null) motivos.push("Stock ilegible");
     if (!["SI", "NO"].includes(r.activo)) motivos.push("Estado ACTIVO desconocido");
     if (recargo !== null && recargo < 0) motivos.push("Precio público inferior al costo con IVA");
@@ -117,10 +120,24 @@ async function main() {
     if (!cols.some(c => c.name === "tipo_articulo")) throw Error("Falta tipo_articulo en SQLite; actualizar SAGVA y Prisma primero.");
     const sucursal = await prisma.sucursal.findUnique({ where: { codigo: sucursalCodigo } });
     if (!sucursal) throw Error("Sucursal " + sucursalCodigo + " no existe; no se creará automáticamente.");
-    const [actuales, catalogo] = await Promise.all([
-      prisma.articulo.findMany({ select: { codigoProducto: true, codigoBarra: true, nombre: true } }),
-      prisma.familia.findMany({ select: { id: true, nombre: true } })
+    const [actuales, catalogo, preciosVigentes, stocksSucursal] = await Promise.all([
+      prisma.articulo.findMany({ select: {
+        id: true, codigoProducto: true, codigoBarra: true, nombre: true, tipoArticulo: true,
+        tipoImpuesto: true, estado: true, unidadMedida: true, subfamiliaId: true, marcaId: true, familiaId: true
+      } }),
+      prisma.familia.findMany({ select: { id: true, nombre: true } }),
+      prisma.articuloPrecio.findMany({ where: { vigente: true }, orderBy: { createdAt: "desc" },
+        select: { articuloId: true, precioSinIva: true, precioConIva: true, precioPublico: true } }),
+      prisma.inventarioStock.findMany({ where: { sucursalId: sucursal.id },
+        select: { articuloId: true, stockActual: true } })
     ]);
+    const nombreFamiliaPorId = new Map(catalogo.map(f => [f.id, f.nombre]));
+    const precioPorArticulo = new Map(), cantidadPrecios = new Map();
+    for (const p of preciosVigentes) {
+      cantidadPrecios.set(p.articuloId, (cantidadPrecios.get(p.articuloId) || 0) + 1);
+      if (!precioPorArticulo.has(p.articuloId)) precioPorArticulo.set(p.articuloId, p);
+    }
+    const stockPorArticulo = new Map(stocksSucursal.map(stock => [stock.articuloId, stock]));
     const porId = new Map(actuales.map(a => [a.codigoProducto, a]));
     const porBarra = new Map(actuales.filter(a => a.codigoBarra).map(a => [a.codigoBarra, a]));
     const familias = new Map();
@@ -133,7 +150,26 @@ async function main() {
       const anterior = porId.get(r.id);
       if (anterior) {
         if (comparable(anterior.nombre) === comparable(r.nombre) && anterior.codigoBarra === r.barra) {
-          existentes.push({ filaExcel: r.filaExcel, id: r.id, nombre: r.nombre, nota: "Ya existe; no modificado" });
+          const precio = precioPorArticulo.get(anterior.id), stock = stockPorArticulo.get(anterior.id);
+          const igual = (a, b) => a != null && b != null && new Prisma.Decimal(a).equals(new Prisma.Decimal(b));
+          const diferencias = [];
+          if (anterior.tipoArticulo !== r.tipoArticulo) diferencias.push("tipo de artículo");
+          if (anterior.tipoImpuesto !== r.tipoImpuesto) diferencias.push("tratamiento tributario");
+          if (anterior.estado !== r.estado) diferencias.push("estado");
+          if (anterior.unidadMedida !== "UNIDAD") diferencias.push("unidad");
+          if (comparable(nombreFamiliaPorId.get(anterior.familiaId)) !== comparable(r.familia)) diferencias.push("familia");
+          if (anterior.subfamiliaId || anterior.marcaId) diferencias.push("subfamilia o marca");
+          if ((cantidadPrecios.get(anterior.id) || 0) > 1) diferencias.push("múltiples precios vigentes");
+          if (!precio || !igual(precio.precioSinIva, r.costo)) diferencias.push("costo neto");
+          if (!precio || !igual(precio.precioConIva, r.bruto)) diferencias.push("costo con IVA");
+          if (!precio || !igual(precio.precioPublico, r.precio)) diferencias.push("precio público");
+          if (!stock || !igual(stock.stockActual, r.stock)) diferencias.push("stock de la sucursal");
+          if (diferencias.length) {
+            plan.pendientes.push({ filaExcel: r.filaExcel, id: r.id, nombre: r.nombre,
+              motivos: ["Ya existe con diferencias; no modificado: " + diferencias.join(", ")] });
+          } else {
+            existentes.push({ filaExcel: r.filaExcel, id: r.id, nombre: r.nombre, nota: "Ya existe y coincide; no modificado" });
+          }
         } else {
           plan.pendientes.push({ filaExcel: r.filaExcel, id: r.id, nombre: r.nombre, motivos: ["El ID está ocupado por otro artículo de SAGVA"] });
         }
@@ -206,3 +242,4 @@ async function main() {
   }
 }
 main().catch(error => { console.error("IMPORTACIÓN DETENIDA:", error.message || error); process.exitCode = 1; });
+

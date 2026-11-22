@@ -118,10 +118,10 @@ function generarCodigoInterno() {
   return `ART-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
 }
 
-function precioDataFromForm(formData: FormData) {
+function precioDataFromForm(formData: FormData, conservarPrecioPublico = false) {
   const precioConIvaInput = numeroDecimalValidado(formData, "precioConIva");
-  const precioSinIvaInput = numeroDecimalValidado(formData, "precioSinIva");
-  const margen = numeroDecimalValidado(formData, "margen") / 100;
+  const precioSinIvaInput = numeroDecimalValidado(formData, "precioSinIva", 5);
+  const margen = conservarPrecioPublico ? 0 : numeroDecimalValidado(formData, "margen") / 100;
   const tipoImpuesto = stringValue(formData, "tipoImpuesto") || "IVA";
   const ultimoEditado = stringValue(formData, "ultimoPrecioEditado");
 
@@ -212,27 +212,37 @@ export async function crearArticuloAction(formData: FormData) {
 
 export async function actualizarArticuloAction(id: string, formData: FormData) {
   const articuloData = articuloDataFromForm(formData);
-  const precioData = precioDataFromForm(formData);
   const conservarPrecioPublico = stringValue(formData, "conservarPrecioPublico") === "si";
+  const actualizarPrecio = stringValue(formData, "actualizarPrecio") !== "no";
+  const precioData = actualizarPrecio ? precioDataFromForm(formData, conservarPrecioPublico) : null;
   const vinculacion = vinculacionProveedorFromForm(formData);
   const reglasMayoristas = reglasMayoristasFromForm(formData);
   await validarFamiliaSubfamilia(articuloData.familiaId, articuloData.subfamiliaId);
 
   await prisma.$transaction(async (tx) => {
-    const precioGuardado = conservarPrecioPublico
+    const nombreRecibido = formData.get("nombre");
+    const articuloAnterior = await tx.articulo.findUnique({ where: { id }, select: { nombre: true } });
+    // No recortar espacios de un nombre importado cuando el usuario no lo cambió.
+    if (typeof nombreRecibido === "string" && articuloAnterior?.nombre === nombreRecibido) {
+      articuloData.nombre = articuloAnterior.nombre;
+    }
+    const precioGuardado = precioData && conservarPrecioPublico
       ? await tx.articuloPrecio.findFirst({
           where: { articuloId: id, vigente: true },
           orderBy: { createdAt: "desc" },
           select: { precioPublico: true }
         })
       : null;
-    const precioParaGuardar = precioGuardado
+    if (precioData && conservarPrecioPublico && !precioGuardado) {
+      throw new Error("No se encontró el precio vigente que se debe conservar.");
+    }
+    const precioParaGuardar = precioData && precioGuardado
       ? {
           ...precioData,
           precioPublico: precioGuardado.precioPublico,
           margen: precioData.precioConIva > 0
             ? Number((Number(precioGuardado.precioPublico) / precioData.precioConIva - 1).toFixed(10))
-            : precioData.margen
+            : 0
         }
       : precioData;
 
@@ -246,13 +256,15 @@ export async function actualizarArticuloAction(id: string, formData: FormData) {
       where: { id },
       data: articuloData
     });
-    await tx.articuloPrecio.updateMany({
-      where: { articuloId: id },
-      data: { vigente: false }
-    });
-    await tx.articuloPrecio.create({
-      data: { articuloId: id, ...precioParaGuardar }
-    });
+    if (precioParaGuardar) {
+      await tx.articuloPrecio.updateMany({
+        where: { articuloId: id },
+        data: { vigente: false }
+      });
+      await tx.articuloPrecio.create({
+        data: { articuloId: id, ...precioParaGuardar }
+      });
+    }
     // Reemplazar las reglas en la misma transacción para que agregar, editar o eliminar
     // no deje el artículo con una lista parcial en caso de error.
     await tx.articuloReglaMayorista.deleteMany({ where: { articuloId: id } });
@@ -304,3 +316,4 @@ export async function actualizarArticuloAction(id: string, formData: FormData) {
   revalidatePath(`/articulos/${id}/editar`);
   redirect("/articulos");
 }
+
