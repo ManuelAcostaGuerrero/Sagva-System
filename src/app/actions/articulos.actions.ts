@@ -8,8 +8,7 @@ import { numberValue, optionalStringValue, stringValue } from "@/lib/form-utils"
 import {
   calcularPrecioConIVA,
   calcularPrecioPublico,
-  calcularPrecioSinIVA,
-  calcularCostoConImpuestoAdicional
+  calcularPrecioSinIVA
 } from "@/utils/calculations/prices";
 
 async function ensureSucursalPrincipal() {
@@ -57,9 +56,6 @@ function precioDataFromForm(formData: FormData) {
   const precioSinIvaInput = numberValue(formData, "precioSinIva", 0);
   const margen = Math.max(0, numberValue(formData, "margen", 30)) / 100;
   const tipoImpuesto = stringValue(formData, "tipoImpuesto") || "IVA";
-  const tasaAdicional = tipoImpuesto === "exento"
-    ? 0
-    : numberValue(formData, "impuestoAdicional", 0);
   const ultimoEditado = stringValue(formData, "ultimoPrecioEditado");
 
   // La edición más reciente manda: no ignorar un precio con IVA modificado.
@@ -78,10 +74,8 @@ function precioDataFromForm(formData: FormData) {
     precioConIva,
     precioSinIva,
     margen,
-    precioPublico: calcularPrecioPublico(
-      calcularCostoConImpuestoAdicional(precioConIva, precioSinIva, tasaAdicional),
-      margen
-    ),
+    // ILA se guarda en el artículo como referencia tributaria; no altera el precio comercial.
+    precioPublico: calcularPrecioPublico(precioConIva, margen),
     precioMayorista: numberValue(formData, "precioMayorista", 0),
     cantidadMinimaMayorista: numberValue(formData, "cantidadMinimaMayorista", 0)
   };

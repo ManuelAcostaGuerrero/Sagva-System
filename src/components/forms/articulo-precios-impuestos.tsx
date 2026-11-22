@@ -62,7 +62,9 @@ export function ArticuloPreciosImpuestos({
   const bruto = valorNumerico(precioConIva);
   const ilaCompra = roundMoney(neto * tasa / 100);
   const costoTotal = calcularCostoConImpuestoAdicional(bruto, neto, tasa);
-  const precioPublico = calcularPrecioPublico(costoTotal, valorNumerico(margen) / 100);
+  // El ILA se conserva para simulación/compra, pero no fija el precio comercial.
+  const precioPublico = calcularPrecioPublico(bruto, valorNumerico(margen) / 100);
+  const precioSimuladoConIla = calcularPrecioPublico(costoTotal, valorNumerico(margen) / 100);
   const tasaDesconocida = !TASAS_BEBIDAS.some((item) => item.value === tasaAdicional);
 
   function editarConIva(value: string) {
@@ -119,7 +121,7 @@ export function ArticuloPreciosImpuestos({
         {exento ? <input type="hidden" name="impuestoAdicional" value="0" /> : null}
       </label>
       <p className="md:col-span-4 text-xs text-slate-600">
-        IVA general: 19%. El ILA se aplica a compras gravadas según el tipo de bebida; en una venta minorista al consumidor final no se recarga nuevamente en la boleta.
+        IVA general: 19%. La tasa ILA identifica el tributo del producto para compras y facturas; no cambia automáticamente el precio público.
       </p>
       <label>
         <span className="sagva-label">Costo sin IVA (base) $</span>
@@ -163,19 +165,23 @@ export function ArticuloPreciosImpuestos({
           className="sagva-field bg-slate-100 font-semibold"
           value={moneda(precioPublico)}
           readOnly
-          aria-label="Precio público sugerido, calculado automáticamente"
+          aria-label="Precio público sugerido, calculado solo sobre el costo con IVA, sin ILA"
         />
       </label>
       <input name="ultimoPrecioEditado" type="hidden" value={ultimoEditado} />
-      <div className="md:col-span-4 rounded-md bg-slate-50 p-3 text-sm text-slate-700" aria-live="polite">
-        <span>IVA incluido en el costo: {moneda(Math.max(0, bruto - neto))}</span>
-        <span className="mx-2">·</span>
-        <span>ILA de compra estimado: {moneda(ilaCompra)} ({tasa}%)</span>
-        <span className="mx-2">·</span>
-        <strong>Costo estimado con impuestos: {moneda(costoTotal)}</strong>
-        <p className="mt-1 text-xs text-slate-600">
-          El precio público usa el costo con IVA más el ILA de compra cuando corresponde, y el recargo definido.
-          Si el costo digitado ya incluye ILA, no lo vuelvas a incorporar; ajusta la base de compra antes de guardar.
+      <div className="md:col-span-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600" aria-live="polite">
+        <p className="font-semibold text-slate-700">Simulación tributaria de compra (solo informativa)</p>
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+          <span>IVA sobre base neta: {moneda(Math.max(0, bruto - neto))}</span>
+          <span>ILA estimado ({tasa}%): {moneda(ilaCompra)}</span>
+          <span>Costo estimado con IVA e ILA: <strong>{moneda(costoTotal)}</strong></span>
+          <span>Precio hipotético con recargo sobre ambos: {moneda(precioSimuladoConIla)}</span>
+        </div>
+        <p className="mt-2 text-xs text-slate-600">
+          Esta simulación no modifica el precio público, el margen configurado ni el precio guardado.
+          El precio público se calcula solo con el costo con IVA. El ILA puede ser un costo real de compra
+          y reducir la rentabilidad: revisa el total de la factura antes de fijar precios.
+          Los montos tributarios definitivos se toman del documento correspondiente.
         </p>
       </div>
     </div>

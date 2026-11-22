@@ -18,7 +18,8 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 - Marca.
 - Tipo de impuesto.
 - Impuesto adicional ILA de bebidas seleccionable por categoría: 0%, 10%, 18%, 20,5% y 31,5%.
-- Precios con/sin IVA calculados automáticamente en pantalla y precio público sugerido visible.
+- Precios con/sin IVA calculados automáticamente en pantalla y precio público sugerido visible, **sin incluir ILA en el cálculo comercial**.
+- Simulación tributaria visual (IVA + ILA) que no modifica precios guardados ni márgenes.
 - Stock mínimo y máximo como referencia para inventario.
 - Unidad de medida y cantidad específica.
 - Comentario interno.
@@ -76,14 +77,15 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 3. El catálogo de bebidas aplica ILA del 10% a bebidas analcohólicas/energéticas, 18% cuando tienen más de 15 g de azúcar por 240 ml, 20,5% a vinos/cervezas/sidras, 31,5% a licores/destilados, y 0% cuando no aplica (SII, DL 825 art. 42).
 4. IVA general: 19%. Exento: 0%. Mostrar el monto del IVA y del ILA estimado en compra, calculando el ILA sobre la base neta.
 5. Cambiar cualquiera de los campos de costo con IVA/sin IVA recalcula el otro; la última edición es la fuente para el guardado en servidor.
-6. El precio público sugerido se recalcula al cambiar costo, tipo de IVA, ILA o recargo de margen (recargo sobre costo, no margen sobre precio de venta).
-7. Para ventas minoristas al consumidor final, el ILA soportado en compra forma parte del costo y no se recarga nuevamente en la boleta; para mayoristas hay reglas especiales que requieren su propia configuración.
-8. Si el costo ingresado ya incluye el impuesto adicional, no aplicarlo una segunda vez; se requiere base de compra sin ILA.
-9. Al crear un artículo, generar un código `ART-` único. Conservar los códigos existentes.
-10. Mantener el código de barras independiente del código del proveedor.
-11. El código externo se identifica por proveedor + código (no es único globalmente).
-12. Permitir varios códigos externos asociados a un mismo artículo, sin duplicar el inventario.
-13. No reasignar a otro artículo un código externo ya asociado dentro del mismo proveedor.
+6. El precio público sugerido se recalcula al cambiar el costo con IVA, el tipo de IVA o el recargo comercial; **el ILA jamás altera automáticamente ese precio**. El porcentaje es un recargo sobre costo, no un margen sobre precio de venta.
+7. La tasa ILA asignada se guarda en la ficha de artículo para referencia de compras y facturas. Una simulación visual separada presenta IVA, ILA, costo combinado y precio hipotético con ambos impuestos, sin modificar ni guardar un segundo precio.
+8. En ventas minoristas a consumidores finales, el ILA soportado en compras puede constituir costo real de venta; la simulación advierte que ignorarlo en el precio comercial puede reducir la rentabilidad. No se recarga otra vez en la boleta del consumidor final.
+9. En facturas se deben utilizar los impuestos que realmente correspondan al documento, validando el tratamiento fiscal de cada operación. La tasa del artículo es un dato referencial, no una autorización para emitir documentos tributarios incorrectos.
+10. Al crear un artículo, generar un código `ART-` único. Conservar los códigos existentes.
+11. Mantener el código de barras independiente del código del proveedor.
+12. El código externo se identifica por proveedor + código (no es único globalmente).
+13. Permitir varios códigos externos asociados a un mismo artículo, sin duplicar el inventario.
+14. No reasignar a otro artículo un código externo ya asociado dentro del mismo proveedor.
 
 ## Integraciones
 
