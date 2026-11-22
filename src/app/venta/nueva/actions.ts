@@ -92,11 +92,14 @@ export async function guardarVentaAction(formData: FormData) {
     const precioUnitario = Number(linea.precioUnitario);
     const descuento = Number(linea.descuento ?? 0);
 
-    if (!linea.articuloId || cantidad <= 0 || precioUnitario < 0 || descuento < 0) {
+    const subtotalBruto = cantidad * precioUnitario;
+    if (!linea.articuloId || !Number.isFinite(cantidad) || cantidad <= 0 ||
+        !Number.isFinite(precioUnitario) || precioUnitario < 0 || !Number.isFinite(subtotalBruto) ||
+        !Number.isFinite(descuento) || descuento < 0 || descuento > toMoney(subtotalBruto)) {
       throw new Error("La venta contiene una línea inválida.");
     }
 
-    const totalLinea = toMoney(Math.max(cantidad * precioUnitario - descuento, 0));
+    const totalLinea = toMoney(subtotalBruto - descuento);
 
     return {
       articuloId: linea.articuloId,
@@ -146,121 +149,146 @@ export async function guardarVentaAction(formData: FormData) {
     redirect("/venta/nueva?error=saldo_pendiente");
   }
 
-  await prisma.$transaction(async (tx) => {
-    const folioDefinitivo = accion === "cobrar" ? await obtenerSiguienteFolio(sucursalId) : null;
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Verificar en la misma transacción que ningún precio/estado cambió desde que se armó la venta.
+      const ids = [...new Set(lineasValidas.map((linea) => linea.articuloId))];
+      const [articulos, precios] = await Promise.all([
+        tx.articulo.findMany({ where: { id: { in: ids }, estado: "activo" }, select: { id: true } }),
+        tx.articuloPrecio.findMany({ where: { articuloId: { in: ids }, vigente: true },
+          orderBy: { createdAt: "desc" }, select: { articuloId: true, precioPublico: true } }),
+      ]);
+      const activos = new Set(articulos.map((articulo) => articulo.id));
+      const preciosVigentes = new Map<string, number>();
+      for (const precio of precios) {
+        if (!preciosVigentes.has(precio.articuloId)) preciosVigentes.set(precio.articuloId, Number(precio.precioPublico));
+      }
+      for (const linea of lineasValidas) {
+        if (!activos.has(linea.articuloId) || !preciosVigentes.has(linea.articuloId) ||
+            preciosVigentes.get(linea.articuloId) !== linea.precioUnitario) {
+          throw new Error("SAGVA_PRECIO_O_ESTADO_CAMBIO");
+        }
+      }
+      const folioDefinitivo = accion === "cobrar" ? await obtenerSiguienteFolio(sucursalId) : null;
 
-    const venta = await tx.venta.create({
-      data: {
-        idTemporal: `VT-${user.id}-${Date.now()}`,
-        folioDefinitivo,
-        vendedorId: user.id,
-        clienteId: null,
-        sucursalId,
-        cajaId: cajaId || null,
-        total,
-        totalPagado,
-        saldoPendiente,
-        vuelto,
-        estado: accion === "cobrar" ? "cobrada" : "pendiente",
-        finalizedAt: accion === "cobrar" ? new Date() : null,
-      },
-    });
-
-    for (const linea of lineasValidas) {
-      await tx.ventaDetalle.create({
+      const venta = await tx.venta.create({
         data: {
-          ventaId: venta.id,
-          articuloId: linea.articuloId,
-          cantidad: linea.cantidad,
-          precioUnitario: linea.precioUnitario,
-          totalLinea: linea.totalLinea,
+          idTemporal: `VT-${user.id}-${Date.now()}`,
+          folioDefinitivo,
+          vendedorId: user.id,
+          clienteId: null,
+          sucursalId,
+          cajaId: cajaId || null,
+          total,
+          totalPagado,
+          saldoPendiente,
+          vuelto,
+          estado: accion === "cobrar" ? "cobrada" : "pendiente",
+          finalizedAt: accion === "cobrar" ? new Date() : null,
         },
       });
 
-      if (accion === "cobrar") {
-        const stock = await tx.inventarioStock.findUnique({
-          where: {
-            articuloId_sucursalId: {
-              articuloId: linea.articuloId,
-              sucursalId,
-            },
+      for (const linea of lineasValidas) {
+        await tx.ventaDetalle.create({
+          data: {
+            ventaId: venta.id,
+            articuloId: linea.articuloId,
+            cantidad: linea.cantidad,
+            precioUnitario: linea.precioUnitario,
+            totalLinea: linea.totalLinea,
           },
         });
 
-        const stockAntes = stock ? Number(stock.stockActual) : 0;
-        const stockDespues = stockAntes - linea.cantidad;
-
-        if (stock) {
-          await tx.inventarioStock.update({
-            where: { id: stock.id },
-            data: {
-              stockActual: stockDespues,
+        if (accion === "cobrar") {
+          const stock = await tx.inventarioStock.findUnique({
+            where: {
+              articuloId_sucursalId: {
+                articuloId: linea.articuloId,
+                sucursalId,
+              },
             },
           });
-        } else {
-          await tx.inventarioStock.create({
+
+          const stockAntes = stock ? Number(stock.stockActual) : 0;
+          const stockDespues = stockAntes - linea.cantidad;
+
+          if (stock) {
+            await tx.inventarioStock.update({
+              where: { id: stock.id },
+              data: {
+                stockActual: stockDespues,
+              },
+            });
+          } else {
+            await tx.inventarioStock.create({
+              data: {
+                articuloId: linea.articuloId,
+                sucursalId,
+                stockActual: stockDespues,
+              },
+            });
+          }
+
+          await tx.inventarioMovimiento.create({
             data: {
               articuloId: linea.articuloId,
               sucursalId,
-              stockActual: stockDespues,
+              tipoMovimiento: stockAntes <= 0 ? "salida_venta_sin_stock" : "salida_venta",
+              cantidad: linea.cantidad,
+              documentoOrigenTipo: "BOLETA",
+              documentoOrigenId: venta.id,
+              usuarioId: user.id,
+              observacion:
+                stockDespues < 0
+                  ? `Salida por venta ${folioDefinitivo}. Stock quedó negativo (${stockDespues}).`
+                  : `Salida por venta ${folioDefinitivo}`,
             },
           });
         }
-
-        await tx.inventarioMovimiento.create({
-          data: {
-            articuloId: linea.articuloId,
-            sucursalId,
-            tipoMovimiento: stockAntes <= 0 ? "salida_venta_sin_stock" : "salida_venta",
-            cantidad: linea.cantidad,
-            documentoOrigenTipo: "BOLETA",
-            documentoOrigenId: venta.id,
-            usuarioId: user.id,
-            observacion:
-              stockDespues < 0
-                ? `Salida por venta ${folioDefinitivo}. Stock quedó negativo (${stockDespues}).`
-                : `Salida por venta ${folioDefinitivo}`,
-          },
-        });
       }
-    }
 
-    for (const pago of pagosValidos) {
-      await tx.ventaPago.create({
-        data: {
-          ventaId: venta.id,
-          metodoPago: pago.metodo,
-          monto: pago.monto,
-        },
-      });
-
-      if (accion === "cobrar" && cajaId) {
-        await tx.cajaMovimiento.create({
+      for (const pago of pagosValidos) {
+        await tx.ventaPago.create({
           data: {
-            cajaId,
-            tipo: "venta",
+            ventaId: venta.id,
+            metodoPago: pago.metodo,
             monto: pago.monto,
-            concepto: `BOLETA:${folioDefinitivo ?? venta.id}`,
-            observacion: pago.metodo.toUpperCase(),
+          },
+        });
+
+        if (accion === "cobrar" && cajaId) {
+          await tx.cajaMovimiento.create({
+            data: {
+              cajaId,
+              tipo: "venta",
+              monto: pago.monto,
+              concepto: `BOLETA:${folioDefinitivo ?? venta.id}`,
+              observacion: pago.metodo.toUpperCase(),
+            },
+          });
+        }
+      }
+
+      if (observacion || clienteNombre) {
+        await tx.auditoria.create({
+          data: {
+            usuarioId: user.id,
+            accion: accion === "cobrar" ? "VENTA_COBRADA" : "VENTA_PENDIENTE",
+            modulo: "ventas",
+            entidad: "Venta",
+            entidadId: venta.id,
+            datoNuevo: JSON.stringify({ clienteNombre, observacion }),
+            motivo: observacion || clienteNombre || null,
           },
         });
       }
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "SAGVA_PRECIO_O_ESTADO_CAMBIO") {
+      return { error: "El precio o estado de un artículo cambió. Quítalo y vuelve a agregarlo para usar los datos actuales." };
     }
-
-    if (observacion || clienteNombre) {
-      await tx.auditoria.create({
-        data: {
-          usuarioId: user.id,
-          accion: accion === "cobrar" ? "VENTA_COBRADA" : "VENTA_PENDIENTE",
-          modulo: "ventas",
-          entidad: "Venta",
-          entidadId: venta.id,
-          datoNuevo: JSON.stringify({ clienteNombre, observacion }),
-          motivo: observacion || clienteNombre || null,
-        },
-      });
-    }
-  });
+    throw error;
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/venta/nueva");

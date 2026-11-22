@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CreditCard, Plus, Trash2, X } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
@@ -121,6 +122,8 @@ export function VentasNuevaClient({
   sucursalId,
   sucursalNombre,
 }: NuevaVentaClientProps) {
+  const router = useRouter();
+  const [errorVenta, setErrorVenta] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const quickMetodoInputRef = useRef<HTMLInputElement>(null);
   const efectivoRecibidoInputRef = useRef<HTMLInputElement>(null);
@@ -237,6 +240,15 @@ export function VentasNuevaClient({
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
+  async function enviarVenta(formData: FormData) {
+    setErrorVenta("");
+    const resultado = await guardarVentaAction(formData);
+    if (resultado?.error) {
+      setErrorVenta(resultado.error);
+      router.refresh();
+    }
+  }
+
   function actualizarVentaActiva(updater: (venta: VentaTemporal) => VentaTemporal) {
     setVentas((current) => current.map((venta) => (venta.id === ventaActivaId ? updater(venta) : venta)));
   }
@@ -276,6 +288,7 @@ export function VentasNuevaClient({
   }
 
   function agregarProducto(producto: ProductoVenta) {
+    setErrorVenta("");
     setBannerVuelto(null);
     limpiarCobroRapido();
     actualizarVentaActiva((venta) => {
@@ -377,6 +390,7 @@ export function VentasNuevaClient({
   }
 
   function eliminarLinea(articuloId: string) {
+    setErrorVenta("");
     actualizarVentaActiva((venta) => ({
       ...venta,
       lineas: venta.lineas.filter((linea) => linea.articuloId !== articuloId),
@@ -530,7 +544,8 @@ export function VentasNuevaClient({
         </Link>
       </div>
 
-      <form ref={formRef} action={guardarVentaAction} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
+      <form ref={formRef} action={enviarVenta} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
+        {errorVenta ? <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800 xl:col-span-2">{errorVenta}</div> : null}
         <input type="hidden" name="sucursalId" value={sucursalId} />
         <input type="hidden" name="cajaId" value={cajaActiva?.id ?? ""} />
         <input type="hidden" name="cliente" value={cliente} />
@@ -576,7 +591,7 @@ export function VentasNuevaClient({
                   className="sagva-field"
                   value={busqueda}
                   onChange={(event) => setBusqueda(event.target.value)}
-                  placeholder="Escribe el producto"
+                  placeholder="Buscar por nombre o código de barras"
                 />
 
                 {busqueda.trim() ? (

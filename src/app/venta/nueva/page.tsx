@@ -60,7 +60,6 @@ export default async function NuevaVentaPage({ searchParams }: NuevaVentaPagePro
           },
         },
         orderBy: { nombre: "asc" },
-        take: 80,
       })
     : [];
 

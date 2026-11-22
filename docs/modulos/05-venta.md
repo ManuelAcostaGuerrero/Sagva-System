@@ -85,3 +85,11 @@ Registrar ventas, productos, pagos parciales, cobros, boletas/tickets, anulacion
 - Definir estados finales de venta.
 - Definir reglas completas de productos sugeridos.
 - Definir comportamiento exacto de préstamos retornables.
+
+
+## Búsqueda y protección del precio público
+
+- La pantalla de nueva venta permite buscar en todos los artículos activos cargados para la sucursal, sin limitar el catálogo a los primeros 80.
+- Antes de registrar una venta, el servidor comprueba dentro de la transacción que los artículos siguen activos y que el precio recibido coincide con el precio público vigente. Si cambió, devuelve un aviso y no registra la venta; la pantalla conserva las líneas para que el usuario retire y agregue el artículo actualizado.
+- El descuento de una línea no puede superar su subtotal. Las reglas de autorización de descuentos todavía requieren validación independiente en el servidor.
+- Esta comprobación no certifica la emisión tributaria ni el tratamiento de IVA retenido.
