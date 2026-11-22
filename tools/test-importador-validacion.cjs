@@ -9,7 +9,7 @@ const testable = original.slice(0, original.lastIndexOf(marker)) + '\nexports.pr
 const js = ts.transpileModule(testable, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
 const sandbox = { exports: {}, require, process, console, Number, Set, Map, String };
 vm.runInNewContext(js, sandbox);
-const row = { filaExcel: 1, idAnterior: '1', codigoBarra: '123', tipoOrigen: 'PRODUCTO', familia: 'PRUEBA', nombre: 'PRUEBA', stock: '-2', precioPublico: '3000', costoNeto: '100.5', activo: 'SI' };
+const row = { filaExcel: 1, idAnterior: '1', codigoBarra: '123', tipoOrigen: 'PRODUCTO', familia: 'PRUEBA', nombre: 'EJEMPLO', stock: '-2', precioPublico: '3000', costoNeto: '100.5', activo: 'SI' };
 const pre = sandbox.exports.prevalidar;
 let result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [row] });
 assert.equal(result.validos.length, 1); assert.equal(result.validos[0].bruto, 119.6); assert.equal(result.validos[0].stock, 0); assert.equal(result.alertas.length, 1);
@@ -17,6 +17,10 @@ result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, nombre: '  Eje
 assert.equal(result.validos[0].nombre, '  Ejemplo  ');
 result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, costoNeto: '1.123456'}] });
 assert.equal(result.validos.length, 0); assert.ok(result.pendientes[0].motivos.some(x => x.includes('cinco decimales')));
+result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, idAnterior: '2', codigoBarra: '456', nombre: '  ejemplo  '}, row] });
+assert.equal(result.validos.length, 0); assert.ok(result.pendientes.every(x => x.motivos.some(m => m.includes('Nombre repetido'))));
+result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, nombre: 'DUPLICADO - Ejemplo'}] });
+assert.equal(result.validos.length, 0); assert.ok(result.pendientes[0].motivos.some(x => x.includes('revisión manual')));
 result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, tipoOrigen: 'PROMOCION'}] });
 assert.equal(result.validos.length, 0); assert.equal(result.pendientes.length, 1);
 console.log('Validación previa: redondeo, stock, precisión y promociones correctos.');

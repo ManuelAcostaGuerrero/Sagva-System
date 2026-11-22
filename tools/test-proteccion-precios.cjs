@@ -28,7 +28,7 @@ const jsx = { jsx: (type, props) => ({ type, props: props || {} }), jsxs: (type,
 const component = loadTS('src/components/forms/articulo-precios-impuestos.tsx', n =>
   n === 'react' ? react : n === 'react/jsx-runtime' ? jsx : n === '@/lib/validacion-decimal' ? decimal :
     n === '@/utils/calculations/prices' ? prices : require(n));
-function render() { cursor = 0; return component.ArticuloPreciosImpuestos({ tipoImpuestoInicial: 'IVA', impuestoAdicionalInicial: 0, precioConIvaInicial: 119.6, precioSinIvaInicial: 100.5, precioPublicoInicial: 1000, margenInicial: 42.8 }); }
+function render() { cursor = 0; return component.ArticuloPreciosImpuestos({ tipoImpuestoInicial: 'IVA', impuestoAdicionalInicial: 0, precioConIvaInicial: 119.6, precioSinIvaInicial: 100.5, precioPublicoInicial: 1000, margenInicial: 30 }); }
 function nodes(value) { if (!value) return []; if (Array.isArray(value)) return value.flatMap(nodes); if (typeof value !== 'object') return []; return [value, ...nodes(value.props?.children)]; }
 function field(tree, name) { const match = nodes(tree).find(x => x.props?.name === name); assert.ok(match, `Falta ${name}`); return match; }
 let tree = render();
@@ -57,7 +57,7 @@ const actions = loadTS('src/app/actions/articulos.actions.ts', n =>
     n === 'next/cache' ? { revalidatePath() {} } : n === 'next/navigation' ? { redirect() {} } : require(n));
 (async () => {
   const input = new FormData();
-  for (const [key, value] of Object.entries({ nombre: '  Prueba  ', tipoArticulo: 'PRODUCTO', tipoImpuesto: 'IVA_RETENIDO', precioSinIva: '9.12345', precioConIva: '10.86', margen: '42.80', ultimoPrecioEditado: 'sin', reglasMayoristas: '[]', conservarPrecioPublico: 'si', actualizarPrecio: 'no' })) input.set(key, value);
+  for (const [key, value] of Object.entries({ nombre: '  Prueba  ', tipoArticulo: 'PRODUCTO', tipoImpuesto: 'IVA_RETENIDO', precioSinIva: '9.12345', precioConIva: '10.86', margen: '30.00', ultimoPrecioEditado: 'sin', reglasMayoristas: '[]', conservarPrecioPublico: 'si', actualizarPrecio: 'no' })) input.set(key, value);
   await actions.actualizarArticuloAction('prueba', input);
   assert.equal(writes, 0); assert.equal(saved, null); assert.equal(savedArticle.nombre, '  Prueba  ');
   input.set('actualizarPrecio', 'si'); input.set('margen', '-1');

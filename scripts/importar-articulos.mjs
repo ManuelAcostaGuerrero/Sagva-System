@@ -29,9 +29,10 @@ function prevalidar(data) {
   if (data?.formato !== "SAGVA-ARTICULOS-1" || !Array.isArray(data.registros)) {
     throw Error("El archivo no corresponde al formato privado SAGVA-ARTICULOS-1.");
   }
-  const contarIds = new Map(), contarBarras = new Map();
+  const contarIds = new Map(), contarBarras = new Map(), contarNombres = new Map();
   for (const r of data.registros) {
-    const id = texto(r.idAnterior), barra = texto(r.codigoBarra);
+    const id = texto(r.idAnterior), barra = texto(r.codigoBarra), nombre = comparable(r.nombre);
+    if (nombre) contarNombres.set(nombre, (contarNombres.get(nombre) || 0) + 1);
     if (id) contarIds.set(id, (contarIds.get(id) || 0) + 1);
     if (barra) contarBarras.set(barra, (contarBarras.get(barra) || 0) + 1);
   }
@@ -51,6 +52,8 @@ function prevalidar(data) {
     if (barra && (contarBarras.get(barra) || 0) > 1) motivos.push("Código de barras duplicado en Excel");
     if (!trib) motivos.push("Tipo EXENTOS fuera de CIGARROS/TABAQUERIA u otro tipo no autorizado");
     if (!nombre.trim()) motivos.push("Nombre vacío");
+    if (nombre.trim() && (contarNombres.get(comparable(nombre)) || 0) > 1) motivos.push("Nombre repetido en el archivo; confirmar si es duplicado");
+    if (/\b(duplicado|eliminar|prueba|test)\b/i.test(nombre)) motivos.push("Nombre marcado para revisión manual");
     if (precio === null || precio <= 0) motivos.push("Precio público faltante o no positivo");
     if (costo === null || costo <= 0) motivos.push("Costo neto faltante o no positivo");
     if (typeof r.costoNeto === "string" && (r.costoNeto.split(".")[1]?.length || 0) > 5) motivos.push("Costo neto con más de cinco decimales");
@@ -140,6 +143,11 @@ async function main() {
     const stockPorArticulo = new Map(stocksSucursal.map(stock => [stock.articuloId, stock]));
     const porId = new Map(actuales.map(a => [a.codigoProducto, a]));
     const porBarra = new Map(actuales.filter(a => a.codigoBarra).map(a => [a.codigoBarra, a]));
+    const porNombre = new Map();
+    for (const a of actuales) {
+      const key = comparable(a.nombre), grupo = porNombre.get(key) ?? [];
+      grupo.push(a); porNombre.set(key, grupo);
+    }
     const familias = new Map();
     for (const f of catalogo) {
       const k = comparable(f.nombre), grupo = familias.get(k) ?? [];
@@ -177,6 +185,10 @@ async function main() {
       }
       if (r.barra && porBarra.has(r.barra)) {
         plan.pendientes.push({ filaExcel: r.filaExcel, id: r.id, nombre: r.nombre, motivos: ["El código de barras está ocupado en SAGVA"] });
+        continue;
+      }
+      if ((porNombre.get(comparable(r.nombre))?.length || 0) > 0) {
+        plan.pendientes.push({ filaExcel: r.filaExcel, id: r.id, nombre: r.nombre, motivos: ["El nombre coincide con otro artículo de SAGVA; revisar"] });
         continue;
       }
       if (r.familia && (familias.get(comparable(r.familia))?.length || 0) > 1) {
