@@ -13,7 +13,7 @@ export default async function NuevoArticuloPage() {
   ]);
 
   return (
-    <AppShell title="Nuevo Artículo" subtitle="Crear ficha, precios y stock inicial">
+    <AppShell title="Nuevo Artículo" subtitle="Crear ficha y configurar precios">
       <ArticuloForm familias={familias} subfamilias={subfamilias} marcas={marcas} proveedores={proveedores} />
     </AppShell>
   );

@@ -29,17 +29,11 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
   return (
     <form action={action} className="space-y-5">
       <section className="sagva-panel">
-        <div className="sagva-panel-title">Información del artículo</div>
+        <div className="sagva-panel-title flex flex-wrap items-center justify-between gap-2">
+          <span>Información del artículo</span>
+          <span className="text-xs font-normal">Código interno SAGVA: {articulo?.codigoProducto ?? "Automático al guardar"}</span>
+        </div>
         <div className="grid gap-4 p-4 md:grid-cols-4">
-          <label>
-            <span className="sagva-label">Código interno SAGVA</span>
-            <input
-              className="sagva-field bg-slate-100"
-              value={articulo?.codigoProducto ?? "Automático al guardar"}
-              readOnly
-              aria-label="Código interno generado por SAGVA"
-            />
-          </label>
           <label>
             <span className="sagva-label">Código de barras</span>
             <input
@@ -99,7 +93,7 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
 
       <section className="sagva-panel">
         <div className="sagva-panel-title">Códigos por proveedor</div>
-        <div className="grid gap-4 p-4 md:grid-cols-2">
+        <div className="grid max-w-3xl gap-3 p-4 md:grid-cols-2">
           {articulo?.proveedorProductos.map((asociacion) => (
             <label key={asociacion.id}>
               <span className="sagva-label">Código en {asociacion.proveedor.nombreComercial || asociacion.proveedor.razonSocial}</span>
@@ -151,24 +145,12 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
         <div className="sagva-panel-title">Inventario</div>
         <div className="grid gap-4 p-4 md:grid-cols-4">
           <label>
-            <span className="sagva-label">Stock inicial</span>
-            <CampoNumerico name="stockInicial" defaultValue={0} decimales={3} />
-          </label>
-          <label>
             <span className="sagva-label">Stock mínimo</span>
             <CampoNumerico name="stockMinimo" defaultValue={Number(articulo?.stockMinimo ?? 0)} decimales={3} />
           </label>
           <label>
             <span className="sagva-label">Stock máximo</span>
             <CampoNumerico name="stockMaximo" defaultValue={Number(articulo?.stockMaximo ?? 0)} decimales={3} />
-          </label>
-          <label className="md:col-span-4">
-            <span className="sagva-label">Comentario</span>
-            <textarea
-              name="comentario"
-              className="sagva-field min-h-20"
-              defaultValue={articulo?.comentario ?? ""}
-            />
           </label>
         </div>
       </section>
@@ -193,6 +175,18 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
                 : []
           }
         />
+      </section>
+
+      <section className="sagva-panel">
+        <div className="sagva-panel-title">Comentario</div>
+          <label className="block p-4">
+            <span className="sagva-label">Comentario</span>
+            <textarea
+              name="comentario"
+              className="sagva-field min-h-20"
+              defaultValue={articulo?.comentario ?? ""}
+            />
+          </label>
       </section>
 
       <div className="flex justify-end gap-3">
