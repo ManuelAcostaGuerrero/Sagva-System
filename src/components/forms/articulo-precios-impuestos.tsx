@@ -11,7 +11,7 @@ import {
 
 const TASAS_BEBIDAS = [
   { value: "0", label: "Sin impuesto adicional (0%)" },
-  { value: "10", label: "Bebidas sin alcohol, energéticas y similares (10%)" },
+  { value: "10", label: "Bebidas analcohólicas gravadas, energizantes y saborizadas (10%)" },
   { value: "18", label: "Bebidas con alto contenido de azúcar, más de 15 g/240 ml (18%)" },
   { value: "20.5", label: "Cervezas, vinos, espumantes y sidras (20,5%)" },
   { value: "31.5", label: "Pisco, whisky, ron, vodka y demás destilados (31,5%)" }
@@ -38,7 +38,7 @@ function moneda(value: number) {
   return new Intl.NumberFormat("es-CL", {
     style: "currency",
     currency: "CLP",
-    maximumFractionDigits: 0
+    maximumFractionDigits: 2
   }).format(value);
 }
 
@@ -54,7 +54,7 @@ export function ArticuloPreciosImpuestos({
   const [precioConIva, setPrecioConIva] = useState(String(precioConIvaInicial));
   const [precioSinIva, setPrecioSinIva] = useState(String(precioSinIvaInicial));
   const [margen, setMargen] = useState(String(margenInicial));
-  const [ultimoEditado, setUltimoEditado] = useState<"con" | "sin">("con");
+  const [ultimoEditado, setUltimoEditado] = useState<"con" | "sin">(precioConIvaInicial > 0 || precioSinIvaInicial === 0 ? "con" : "sin");
 
   const exento = tipoImpuesto === "exento";
   const tasa = exento ? 0 : valorNumerico(tasaAdicional);
