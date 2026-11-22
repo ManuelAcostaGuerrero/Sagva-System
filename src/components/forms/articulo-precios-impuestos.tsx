@@ -27,6 +27,7 @@ type PreciosImpuestosProps = {
   impuestoAdicionalInicial: number;
   precioConIvaInicial: number;
   precioSinIvaInicial: number;
+  precioPublicoInicial: number;
   margenInicial: number;
 };
 
@@ -51,6 +52,7 @@ export function ArticuloPreciosImpuestos({
   impuestoAdicionalInicial,
   precioConIvaInicial,
   precioSinIvaInicial,
+  precioPublicoInicial,
   margenInicial
 }: PreciosImpuestosProps) {
   const [tipoImpuesto, setTipoImpuesto] = useState(tipoImpuestoInicial);
@@ -58,6 +60,8 @@ export function ArticuloPreciosImpuestos({
   const [precioConIva, setPrecioConIva] = useState(String(precioConIvaInicial));
   const [precioSinIva, setPrecioSinIva] = useState(String(precioSinIvaInicial));
   const [margen, setMargen] = useState(String(margenInicial));
+  // Conservar el precio de venta exacto al editar solo datos de clasificación, marca o stock.
+  const [conservarPrecioPublico, setConservarPrecioPublico] = useState(precioPublicoInicial > 0);
   const [ultimoEditado, setUltimoEditado] = useState<"con" | "sin">(precioConIvaInicial > 0 || precioSinIvaInicial === 0 ? "con" : "sin");
 
   const exento = tipoImpuesto === "exento";
@@ -67,13 +71,16 @@ export function ArticuloPreciosImpuestos({
   const ilaCompra = roundMoney(neto * tasa / 100);
   const costoTotal = calcularCostoConImpuestoAdicional(bruto, neto, tasa);
   // El ILA se conserva para simulación/compra, pero no fija el precio comercial.
-  const precioPublico = calcularPrecioPublico(bruto, valorNumerico(margen) / 100);
+  const precioPublico = conservarPrecioPublico
+    ? precioPublicoInicial
+    : calcularPrecioPublico(bruto, valorNumerico(margen) / 100);
   const precioSimuladoConIla = calcularPrecioPublico(costoTotal, valorNumerico(margen) / 100);
   const tasaDesconocida = !TASAS_BEBIDAS.some((item) => item.value === tasaAdicional);
 
   function editarConIva(value: string) {
     if (!decimalEnEdicionValido(value)) return;
     setUltimoEditado("con");
+    setConservarPrecioPublico(false);
     setPrecioConIva(value);
     setPrecioSinIva(value === "" ? "" : toField(exento ? valorNumerico(value) : calcularPrecioSinIVA(valorNumerico(value))));
   }
@@ -81,15 +88,20 @@ export function ArticuloPreciosImpuestos({
   function editarSinIva(value: string) {
     if (!decimalEnEdicionValido(value)) return;
     setUltimoEditado("sin");
+    setConservarPrecioPublico(false);
     setPrecioSinIva(value);
     setPrecioConIva(value === "" ? "" : toField(exento ? valorNumerico(value) : calcularPrecioConIVA(valorNumerico(value))));
   }
 
   function editarMargen(value: string) {
-    if (decimalEnEdicionValido(value)) setMargen(value);
+    if (decimalEnEdicionValido(value)) {
+      setConservarPrecioPublico(false);
+      setMargen(value);
+    }
   }
 
   function cambiarTipo(value: string) {
+    setConservarPrecioPublico(false);
     setTipoImpuesto(value);
     if (value === "exento") setTasaAdicional("0");
     const isExento = value === "exento";
@@ -183,15 +195,16 @@ export function ArticuloPreciosImpuestos({
         />
       </label>
       <label>
-        <span className="sagva-label">Precio público sugerido $</span>
+        <span className="sagva-label">{conservarPrecioPublico ? "Precio público guardado $" : "Precio público sugerido $"}</span>
         <input
           className="sagva-field bg-slate-100 font-semibold"
           value={moneda(precioPublico)}
           readOnly
-          aria-label="Precio público sugerido, calculado solo sobre el costo con IVA, sin ILA"
+          aria-label={conservarPrecioPublico ? "Precio público guardado, sin cambios" : "Precio público sugerido, calculado desde el costo y recargo"}
         />
       </label>
       <input name="ultimoPrecioEditado" type="hidden" value={ultimoEditado} />
+      <input name="conservarPrecioPublico" type="hidden" value={conservarPrecioPublico ? "si" : "no"} />
       <div className="md:col-span-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600" aria-live="polite">
         <p className="font-semibold text-slate-700">Simulación tributaria de compra (solo informativa)</p>
         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">

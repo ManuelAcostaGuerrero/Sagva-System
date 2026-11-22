@@ -213,11 +213,29 @@ export async function crearArticuloAction(formData: FormData) {
 export async function actualizarArticuloAction(id: string, formData: FormData) {
   const articuloData = articuloDataFromForm(formData);
   const precioData = precioDataFromForm(formData);
+  const conservarPrecioPublico = stringValue(formData, "conservarPrecioPublico") === "si";
   const vinculacion = vinculacionProveedorFromForm(formData);
   const reglasMayoristas = reglasMayoristasFromForm(formData);
   await validarFamiliaSubfamilia(articuloData.familiaId, articuloData.subfamiliaId);
 
   await prisma.$transaction(async (tx) => {
+    const precioGuardado = conservarPrecioPublico
+      ? await tx.articuloPrecio.findFirst({
+          where: { articuloId: id, vigente: true },
+          orderBy: { createdAt: "desc" },
+          select: { precioPublico: true }
+        })
+      : null;
+    const precioParaGuardar = precioGuardado
+      ? {
+          ...precioData,
+          precioPublico: precioGuardado.precioPublico,
+          margen: precioData.precioConIva > 0
+            ? Number((Number(precioGuardado.precioPublico) / precioData.precioConIva - 1).toFixed(10))
+            : precioData.margen
+        }
+      : precioData;
+
     // Consultar desde BD evita que el formulario modifique códigos de otros artículos.
     const asociaciones = await tx.proveedorProductoAsociado.findMany({
       where: { articuloId: id },
@@ -233,7 +251,7 @@ export async function actualizarArticuloAction(id: string, formData: FormData) {
       data: { vigente: false }
     });
     await tx.articuloPrecio.create({
-      data: { articuloId: id, ...precioData }
+      data: { articuloId: id, ...precioParaGuardar }
     });
     // Reemplazar las reglas en la misma transacción para que agregar, editar o eliminar
     // no deje el artículo con una lista parcial en caso de error.

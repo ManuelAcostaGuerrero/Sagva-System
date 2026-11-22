@@ -155,7 +155,8 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
           impuestoAdicionalInicial={Number(articulo?.impuestoAdicional ?? 0)}
           precioConIvaInicial={Number(precio?.precioConIva ?? 0)}
           precioSinIvaInicial={Number(precio?.precioSinIva ?? 0)}
-          margenInicial={Number(precio?.margen ?? 0.3) * 100}
+          precioPublicoInicial={Number(precio?.precioPublico ?? 0)}
+          margenInicial={Math.round(Number(precio?.margen ?? 0.3) * 10000) / 100}
         />
       </section>
 
