@@ -124,3 +124,12 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 - Definir si precio público permite redondeo automático.
 - Validar las tasas y el tratamiento tributario de ventas mayoristas con contabilidad antes de automatizar facturas tributarias.
 - Fuente tributaria: https://www.sii.cl/preguntas_frecuentes/impuestos_mensuales/001_130_1250.htm y https://www.sii.cl/preguntas_frecuentes/impuestos_mensuales/001_130_1899.htm
+
+
+## Altas desde la ficha y criterio de migración
+
+- El selector **Familia** tiene botón `+` para crear una familia sin abandonar la ficha. Si ya existe un nombre equivalente (ignorando mayúsculas y espacios repetidos), se reutiliza y se selecciona.
+- **Subfamilia** tiene botón `+`, disponible solo cuando hay una familia seleccionada. La nueva subfamilia siempre queda ligada a dicha familia y se evita repetir nombres dentro de una misma familia.
+- **Marca** es independiente de familia/subfamilia y no se asigna automáticamente.
+- **Importación planificada desde Excel:** importar únicamente FAMILIA; crearla si no existe o reutilizarla si existe. No importar SUBFAMILIA por ahora; dejarla sin asignar para clasificación posterior. Las PROMOCIONES tampoco se importan, se construirán manualmente luego.
+- Esta decisión documenta el alcance de la futura importación; todavía no ejecuta la importación de artículos ni modifica SQLite.
