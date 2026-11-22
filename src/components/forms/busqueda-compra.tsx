@@ -20,7 +20,7 @@ export function BusquedaCompra() {
   function buscarProveedor() {
     setMensaje("");
     iniciar(async () => {
-      try { setProveedores(await buscarProveedoresFactura(proveedorTexto)); }
+      try { const encontrados = await buscarProveedoresFactura(proveedorTexto); setProveedores(encontrados); if (!encontrados.length) setMensaje("No se encontraron proveedores."); }
       catch { setMensaje("No se pudieron buscar proveedores."); }
     });
   }
@@ -28,7 +28,7 @@ export function BusquedaCompra() {
     if (!proveedor) return;
     setMensaje("");
     iniciar(async () => {
-      try { setArticulos(await buscarArticulosFactura(proveedor.id, texto)); }
+      try { const encontrados = await buscarArticulosFactura(proveedor.id, texto); setArticulos(encontrados); if (!encontrados.length) setMensaje("No se encontraron artículos para esa búsqueda."); }
       catch { setMensaje("No se pudieron buscar artículos."); }
     });
   }
@@ -51,6 +51,7 @@ export function BusquedaCompra() {
         </label>
         <button type="button" className="sagva-button-secondary" onClick={buscarProveedor} disabled={pendiente}>Buscar proveedor</button>
         {proveedores.length > 0 && !proveedor && <ul className="space-y-1">{proveedores.map((item) => <li key={item.id}><button type="button" className="text-blue-700 underline text-left" onClick={() => { setProveedor(item); setProveedores([]); setProveedorTexto(item.nombreComercial || item.razonSocial); setMensaje(""); }}>{item.nombreComercial || item.razonSocial} — {item.rut}</button></li>)}</ul>}
+        {mensaje && !proveedor && <p role="status">{mensaje}</p>}
         {proveedor && <p>Proveedor seleccionado: <strong>{proveedor.razonSocial}</strong> · {proveedor.rut}</p>}
       </section>
       <section className="sagva-panel p-4 space-y-3">

@@ -1,12 +1,14 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/session";
 
 function normalizarRut(valor: string) {
   return valor.replace(/[^0-9kK]/g, "").toUpperCase();
 }
 
 export async function buscarProveedoresFactura(texto: string) {
+  if (!(await getCurrentUser())) throw new Error("Debes iniciar sesión.");
   const consulta = texto.trim().toLocaleLowerCase("es-CL");
   if (!consulta || consulta.length > 100) return [];
   const proveedores = await prisma.proveedor.findMany({
@@ -14,7 +16,7 @@ export async function buscarProveedoresFactura(texto: string) {
     select: { id: true, rut: true, razonSocial: true, nombreComercial: true },
     orderBy: { razonSocial: "asc" }
   });
-  const rut = normalizarRut(consulta);
+  const rut = /^[0-9.\-kK]+$/.test(consulta) ? normalizarRut(consulta) : "";
   return proveedores.filter((proveedor) =>
     proveedor.razonSocial.toLocaleLowerCase("es-CL").includes(consulta) ||
     (proveedor.nombreComercial ?? "").toLocaleLowerCase("es-CL").includes(consulta) ||
@@ -23,6 +25,7 @@ export async function buscarProveedoresFactura(texto: string) {
 }
 
 export async function buscarArticulosFactura(proveedorId: string, texto: string) {
+  if (!(await getCurrentUser())) throw new Error("Debes iniciar sesión.");
   const consulta = texto.trim();
   if (!proveedorId || !consulta || consulta.length > 100) return [];
   const proveedor = await prisma.proveedor.findFirst({ where: { id: proveedorId, estado: "activo" }, select: { id: true } });
@@ -45,6 +48,7 @@ export async function buscarArticulosFactura(proveedorId: string, texto: string)
 }
 
 export async function vincularCodigoFactura(proveedorId: string, articuloId: string, codigoInput: string) {
+  if (!(await getCurrentUser())) return { error: "Debes iniciar sesión." };
   const codigo = codigoInput.trim();
   if (!proveedorId || !articuloId || !codigo || codigo.length > 100) return { error: "Selecciona proveedor, artículo y código válido." };
   try {

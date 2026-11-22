@@ -1,0 +1,9 @@
+const fs=require('fs'),ts=require('typescript'),vm=require('vm'),assert=require('assert');
+const src=fs.readFileSync('src/app/actions/factura-busqueda.actions.ts','utf8');
+const js=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+let user=true,lastQuery,existing=null,created=[];
+const tx={proveedor:{findFirst:async()=>({id:'p1'})},articulo:{findFirst:async()=>({id:'a1',nombre:'Cristal'})},proveedorProductoAsociado:{findUnique:async()=>existing,create:async x=>created.push(x)}};
+const db={proveedor:{findMany:async()=>[{id:'p1',razonSocial:'CCU',nombreComercial:null,rut:'76.123.456-7'},{id:'p2',razonSocial:'Bonomini',nombreComercial:null,rut:'77.111.111-1'}],findFirst:tx.proveedor.findFirst},articulo:{findMany:async q=>(lastQuery=q,[])},$transaction:async fn=>fn(tx)};
+const tested={};const ctx={exports:tested,require:(name)=>name==='@/lib/prisma'?{prisma:db}:name==='@/lib/session'?{getCurrentUser:async()=>user?{id:'u'}:null}:require(name),console};vm.runInNewContext(js,ctx);
+(async()=>{assert.equal((await tested.buscarProveedoresFactura('761234567'))[0].id,'p1');assert.equal((await tested.buscarProveedoresFactura('ccu'))[0].id,'p1');await tested.buscarArticulosFactura('p1','123');assert.equal(lastQuery.where.OR[2].proveedorProductos.some.proveedorId,'p1');existing={articuloId:'otro'};assert.ok((await tested.vincularCodigoFactura('p1','a1','123')).error);assert.equal(created.length,0);existing=null;assert.equal((await tested.vincularCodigoFactura('p1','a1','123')).ok,true);assert.equal(created[0].data.proveedorId,'p1');user=false;assert.ok((await tested.vincularCodigoFactura('p1','a1','123')).error);console.log('Pruebas de búsqueda, aislamiento, conflicto y sesión: correctas (con base simulada).')})().catch(e=>{console.error(e);process.exit(1)});
+
