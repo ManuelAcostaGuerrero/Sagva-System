@@ -48,6 +48,8 @@ function prevalidar(data) {
     if (!/^\d{1,15}$/.test(id)) motivos.push("ID antiguo no numérico o no confiable");
     if ((contarIds.get(id) || 0) > 1) motivos.push("ID anterior duplicado");
     if (barra && /[eE]\s*[+-]\s*\d+/.test(barra)) motivos.push("Código de barras en notación científica: valor original incierto");
+    if (/^\d{16,}$/.test(barra)) motivos.push("Código de barras con más de 15 dígitos: comprobar precisión en el original");
+    if (/^d\s*-/i.test(barra) || /^https?:\/\//i.test(barra) || /[{}]/.test(barra)) motivos.push("Código de barras parece una marca, enlace o dato dañado: revisar");
     if (barra.length > 100) motivos.push("Código de barras demasiado largo");
     if (barra && (contarBarras.get(barra) || 0) > 1) motivos.push("Código de barras duplicado en Excel");
     if (!trib) motivos.push("Tipo EXENTOS fuera de CIGARROS/TABAQUERIA u otro tipo no autorizado");

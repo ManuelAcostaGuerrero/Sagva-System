@@ -21,6 +21,13 @@ result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, idAnterior: '2
 assert.equal(result.validos.length, 0); assert.ok(result.pendientes.every(x => x.motivos.some(m => m.includes('Nombre repetido'))));
 result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, nombre: 'DUPLICADO - Ejemplo'}] });
 assert.equal(result.validos.length, 0); assert.ok(result.pendientes[0].motivos.some(x => x.includes('revisión manual')));
+for (const codigoBarra of ['55557501013118020', '8.9560262000703E+14', 'D - 78026575', 'HTTPS://COKEURL.COM/Q/CL', '7802215106033}']) {
+  result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, codigoBarra}] });
+  assert.equal(result.validos.length, 0, codigoBarra);
+  assert.ok(result.pendientes[0].motivos.some(x => x.includes('barras')), codigoBarra);
+}
+result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, codigoBarra: '0003562J43801'}] });
+assert.equal(result.validos.length, 1); assert.equal(result.validos[0].barra, '0003562J43801');
 result = pre({ formato: 'SAGVA-ARTICULOS-1', registros: [{...row, tipoOrigen: 'PROMOCION'}] });
 assert.equal(result.validos.length, 0); assert.equal(result.pendientes.length, 1);
 console.log('Validación previa: redondeo, stock, precisión y promociones correctos.');
