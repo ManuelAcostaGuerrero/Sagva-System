@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import {
+  decimalAValor,
+  decimalEnEdicionValido,
+  normalizarDecimalAlSalir
+} from "@/lib/validacion-decimal";
+import {
   calcularPrecioConIVA,
   calcularPrecioPublico,
   calcularPrecioSinIVA,
@@ -26,8 +31,7 @@ type PreciosImpuestosProps = {
 };
 
 function valorNumerico(value: string) {
-  const valueNumber = Number(value);
-  return Number.isFinite(valueNumber) && valueNumber > 0 ? valueNumber : 0;
+  return decimalAValor(value);
 }
 
 function toField(value: number) {
@@ -68,15 +72,21 @@ export function ArticuloPreciosImpuestos({
   const tasaDesconocida = !TASAS_BEBIDAS.some((item) => item.value === tasaAdicional);
 
   function editarConIva(value: string) {
+    if (!decimalEnEdicionValido(value)) return;
     setUltimoEditado("con");
     setPrecioConIva(value);
     setPrecioSinIva(value === "" ? "" : toField(exento ? valorNumerico(value) : calcularPrecioSinIVA(valorNumerico(value))));
   }
 
   function editarSinIva(value: string) {
+    if (!decimalEnEdicionValido(value)) return;
     setUltimoEditado("sin");
     setPrecioSinIva(value);
     setPrecioConIva(value === "" ? "" : toField(exento ? valorNumerico(value) : calcularPrecioConIVA(valorNumerico(value))));
+  }
+
+  function editarMargen(value: string) {
+    if (decimalEnEdicionValido(value)) setMargen(value);
   }
 
   function cambiarTipo(value: string) {
@@ -127,36 +137,48 @@ export function ArticuloPreciosImpuestos({
         <span className="sagva-label">Costo sin IVA (base) $</span>
         <input
           name="precioSinIva"
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           className="sagva-field"
           value={precioSinIva}
+          onFocus={() => {
+            if (precioSinIva !== "" && valorNumerico(precioSinIva) === 0) setPrecioSinIva("");
+          }}
           onChange={(event) => editarSinIva(event.target.value)}
+          onBlur={() => setPrecioSinIva((actual) => normalizarDecimalAlSalir(actual))}
         />
       </label>
       <label>
         <span className="sagva-label">Costo con IVA (sin ILA) $</span>
         <input
           name="precioConIva"
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           className="sagva-field"
           value={precioConIva}
+          onFocus={() => {
+            if (precioConIva !== "" && valorNumerico(precioConIva) === 0) setPrecioConIva("");
+          }}
           onChange={(event) => editarConIva(event.target.value)}
+          onBlur={() => setPrecioConIva((actual) => normalizarDecimalAlSalir(actual))}
         />
       </label>
       <label>
         <span className="sagva-label">Margen / recargo sobre costo %</span>
         <input
           name="margen"
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           className="sagva-field"
           value={margen}
-          onChange={(event) => setMargen(event.target.value)}
+          onFocus={() => {
+            if (margen !== "" && valorNumerico(margen) === 0) setMargen("");
+          }}
+          onChange={(event) => editarMargen(event.target.value)}
+          onBlur={() => setMargen((actual) => normalizarDecimalAlSalir(actual))}
         />
       </label>
       <label>

@@ -1,6 +1,7 @@
 import type { Articulo, ArticuloPrecio, Familia, Marca, Proveedor, ProveedorProductoAsociado, Subfamilia } from "@prisma/client";
 import { Save } from "lucide-react";
 import { ArticuloPreciosImpuestos } from "@/components/forms/articulo-precios-impuestos";
+import { CampoNumerico } from "@/components/forms/campo-numerico";
 import { crearArticuloAction, actualizarArticuloAction } from "@/app/actions/articulos.actions";
 
 type ArticuloWithPrecio = Articulo & {
@@ -168,47 +169,23 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
         <div className="grid gap-4 p-4 md:grid-cols-4">
           <label>
             <span className="sagva-label">Precio mayorista</span>
-            <input
-              name="precioMayorista"
-              type="number"
-              step="0.01"
-              className="sagva-field"
-              defaultValue={Number(precio?.precioMayorista ?? 0)}
-            />
+            <CampoNumerico name="precioMayorista" defaultValue={Number(precio?.precioMayorista ?? 0)} decimales={2} />
           </label>
           <label>
             <span className="sagva-label">Stock inicial</span>
-            <input name="stockInicial" type="number" step="0.001" className="sagva-field" defaultValue="0" />
+            <CampoNumerico name="stockInicial" defaultValue={0} decimales={3} />
           </label>
           <label>
             <span className="sagva-label">Stock mínimo</span>
-            <input
-              name="stockMinimo"
-              type="number"
-              step="0.001"
-              className="sagva-field"
-              defaultValue={Number(articulo?.stockMinimo ?? 0)}
-            />
+            <CampoNumerico name="stockMinimo" defaultValue={Number(articulo?.stockMinimo ?? 0)} decimales={3} />
           </label>
           <label>
             <span className="sagva-label">Stock máximo</span>
-            <input
-              name="stockMaximo"
-              type="number"
-              step="0.001"
-              className="sagva-field"
-              defaultValue={Number(articulo?.stockMaximo ?? 0)}
-            />
+            <CampoNumerico name="stockMaximo" defaultValue={Number(articulo?.stockMaximo ?? 0)} decimales={3} />
           </label>
           <label>
             <span className="sagva-label">Mínimo mayorista</span>
-            <input
-              name="cantidadMinimaMayorista"
-              type="number"
-              step="0.001"
-              className="sagva-field"
-              defaultValue={Number(precio?.cantidadMinimaMayorista ?? 0)}
-            />
+            <CampoNumerico name="cantidadMinimaMayorista" defaultValue={Number(precio?.cantidadMinimaMayorista ?? 0)} decimales={3} />
           </label>
           <label className="md:col-span-4">
             <span className="sagva-label">Comentario</span>

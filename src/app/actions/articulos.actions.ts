@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { numberValue, optionalStringValue, stringValue } from "@/lib/form-utils";
+import { numeroDecimalValidado, optionalStringValue, stringValue } from "@/lib/form-utils";
 import {
   calcularPrecioConIVA,
   calcularPrecioPublico,
@@ -29,9 +29,9 @@ function articuloDataFromForm(formData: FormData) {
     unidadMedida: stringValue(formData, "unidadMedida") || "UND",
     cantidadEspecifica: optionalStringValue(formData, "cantidadEspecifica"),
     tipoImpuesto: stringValue(formData, "tipoImpuesto") || "IVA",
-    impuestoAdicional: numberValue(formData, "impuestoAdicional", 0),
-    stockMinimo: numberValue(formData, "stockMinimo", 0),
-    stockMaximo: numberValue(formData, "stockMaximo", 0),
+    impuestoAdicional: numeroDecimalValidado(formData, "impuestoAdicional"),
+    stockMinimo: numeroDecimalValidado(formData, "stockMinimo", 3),
+    stockMaximo: numeroDecimalValidado(formData, "stockMaximo", 3),
     comentario: optionalStringValue(formData, "comentario"),
     estado: stringValue(formData, "estado") || "activo"
   };
@@ -52,9 +52,9 @@ function generarCodigoInterno() {
 }
 
 function precioDataFromForm(formData: FormData) {
-  const precioConIvaInput = numberValue(formData, "precioConIva", 0);
-  const precioSinIvaInput = numberValue(formData, "precioSinIva", 0);
-  const margen = Math.max(0, numberValue(formData, "margen", 30)) / 100;
+  const precioConIvaInput = numeroDecimalValidado(formData, "precioConIva");
+  const precioSinIvaInput = numeroDecimalValidado(formData, "precioSinIva");
+  const margen = numeroDecimalValidado(formData, "margen") / 100;
   const tipoImpuesto = stringValue(formData, "tipoImpuesto") || "IVA";
   const ultimoEditado = stringValue(formData, "ultimoPrecioEditado");
 
@@ -76,15 +76,15 @@ function precioDataFromForm(formData: FormData) {
     margen,
     // ILA se guarda en el artículo como referencia tributaria; no altera el precio comercial.
     precioPublico: calcularPrecioPublico(precioConIva, margen),
-    precioMayorista: numberValue(formData, "precioMayorista", 0),
-    cantidadMinimaMayorista: numberValue(formData, "cantidadMinimaMayorista", 0)
+    precioMayorista: numeroDecimalValidado(formData, "precioMayorista"),
+    cantidadMinimaMayorista: numeroDecimalValidado(formData, "cantidadMinimaMayorista", 3)
   };
 }
 
 export async function crearArticuloAction(formData: FormData) {
   const articuloData = articuloDataFromForm(formData);
   const precioData = precioDataFromForm(formData);
-  const stockInicial = numberValue(formData, "stockInicial", 0);
+  const stockInicial = numeroDecimalValidado(formData, "stockInicial", 3);
   const vinculacion = vinculacionProveedorFromForm(formData);
 
   if (!articuloData.nombre) {

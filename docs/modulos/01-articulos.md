@@ -76,7 +76,10 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 2. Si se ingresa precio sin IVA, calcular precio con IVA.
 3. El catálogo de bebidas aplica ILA del 10% a bebidas analcohólicas/energéticas, 18% cuando tienen más de 15 g de azúcar por 240 ml, 20,5% a vinos/cervezas/sidras, 31,5% a licores/destilados, y 0% cuando no aplica (SII, DL 825 art. 42).
 4. IVA general: 19%. Exento: 0%. Mostrar el monto del IVA y del ILA estimado en compra, calculando el ILA sobre la base neta.
-5. Cambiar cualquiera de los campos de costo con IVA/sin IVA recalcula el otro; la última edición es la fuente para el guardado en servidor.
+5. Cambiar cualquiera de los campos de costo con IVA/sin IVA recalcula el otro y el precio público sugerido de inmediato, según el porcentaje comercial; la última edición es la fuente para el guardado en servidor.
+   - Los campos de costo y recargo porcentual son de escritura numérica directa (sin flechas para aumentar/disminuir); aceptan punto o coma decimal, no letras, signos, valores negativos ni exponentes.
+   - Cuando el campo vale cero, al hacer clic se limpia temporalmente para escribir; si vale más de cero, conserva el valor para editar normalmente. Los vacíos al salir vuelven a cero.
+   - La validación también se ejecuta en servidor antes de guardar; los importes admiten hasta dos decimales y las cantidades de stock hasta tres.
 6. El precio público sugerido se recalcula al cambiar el costo con IVA, el tipo de IVA o el recargo comercial; **el ILA jamás altera automáticamente ese precio**. El porcentaje es un recargo sobre costo, no un margen sobre precio de venta.
 7. La tasa ILA asignada se guarda en la ficha de artículo para referencia de compras y facturas. Una simulación visual separada presenta IVA, ILA, costo combinado y precio hipotético con ambos impuestos, sin modificar ni guardar un segundo precio.
 8. En ventas minoristas a consumidores finales, el ILA soportado en compras puede constituir costo real de venta; la simulación advierte que ignorarlo en el precio comercial puede reducir la rentabilidad. No se recarga otra vez en la boleta del consumidor final.
