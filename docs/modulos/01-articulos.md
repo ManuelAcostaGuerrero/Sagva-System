@@ -26,7 +26,7 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 - Precio con IVA y sin IVA.
 - Margen editable.
 - Precio público.
-- Precio por mayor y cantidad mínima.
+- Lista de reglas mayoristas por artículo, con cantidad mínima y precio por unidad; permite agregar, editar y eliminar tramos.
 
 ## Qué no incluye
 
@@ -67,8 +67,8 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 | precio_sin_iva | Precio neto |
 | margen | Porcentaje de ganancia, por defecto 30% |
 | precio_publico | Precio final cliente |
-| precio_mayorista | Precio por mayor opcional |
-| cantidad_minima_mayorista | Mínimo para aplicar precio por mayor |
+| articulo_reglas_mayoristas | Lista por artículo: cantidad mínima y precio por unidad |
+| precio_mayorista / cantidad_minima_mayorista | Columnas anteriores conservadas para compatibilidad y lectura de reglas heredadas |
 
 ## Reglas de negocio
 
@@ -89,6 +89,12 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 12. El código externo se identifica por proveedor + código (no es único globalmente).
 13. Permitir varios códigos externos asociados a un mismo artículo, sin duplicar el inventario.
 14. No reasignar a otro artículo un código externo ya asociado dentro del mismo proveedor.
+15. La subfamilia depende de la familia: al cambiar la familia, limpiar la subfamilia seleccionada y listar solamente las que pertenecen a la nueva familia. Validarlo también en servidor.
+16. Cada artículo puede tener una lista de reglas mayoristas, con cantidad mínima positiva y precio por unidad positivo. Las cantidades admiten hasta tres decimales y los precios hasta dos.
+17. No permitir dos reglas mayoristas con la misma cantidad mínima por artículo; se pueden agregar, editar y eliminar desde la ficha.
+18. Para una cantidad de compra/venta determinada, corresponde la regla con la mayor cantidad mínima alcanzada. Sin reglas aplicables, se usa el precio público normal.
+19. Al editar artículos antiguos, mostrar el precio mayorista y cantidad mínima legados como regla inicial mientras no existan reglas nuevas; al guardar, convertirlos a la nueva tabla sin modificar ventas históricas.
+20. Las reglas no modifican el precio público normal ni el ILA. Su utilización automática en la pantalla de ventas requiere una etapa propia de integración y pruebas.
 
 ## Integraciones
 
@@ -102,6 +108,8 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 
 - Completar la búsqueda y asociación de artículos por código del proveedor o código de barras desde el ingreso real de facturas.
 - Validar las asociaciones en el equipo local con datos de prueba antes de actualizar la instalación productiva.
+- Validar la creación de tabla mayorista adicional en una copia de SQLite, sin ejecutar migraciones sobre datos reales.
+- Integrar y verificar la aplicación de tramos mayoristas durante las ventas antes de habilitar descuentos automáticos en caja.
 
 - Definir estados finales del artículo.
 - Definir fórmula exacta para artículo exento + impuesto adicional.

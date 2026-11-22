@@ -1,11 +1,14 @@
-import type { Articulo, ArticuloPrecio, Familia, Marca, Proveedor, ProveedorProductoAsociado, Subfamilia } from "@prisma/client";
+import type { Articulo, ArticuloPrecio, ArticuloReglaMayorista, Familia, Marca, Proveedor, ProveedorProductoAsociado, Subfamilia } from "@prisma/client";
 import { Save } from "lucide-react";
 import { ArticuloPreciosImpuestos } from "@/components/forms/articulo-precios-impuestos";
 import { CampoNumerico } from "@/components/forms/campo-numerico";
+import { ArticuloClasificacion } from "@/components/forms/articulo-clasificacion";
+import { ArticuloReglasMayoristas } from "@/components/forms/articulo-reglas-mayoristas";
 import { crearArticuloAction, actualizarArticuloAction } from "@/app/actions/articulos.actions";
 
 type ArticuloWithPrecio = Articulo & {
   precios: ArticuloPrecio[];
+  reglasMayoristas: ArticuloReglaMayorista[];
   proveedorProductos: Array<ProveedorProductoAsociado & { proveedor: Proveedor }>;
 };
 
@@ -62,32 +65,12 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
               required
             />
           </label>
-          <label>
-            <span className="sagva-label">Familia</span>
-            <select name="familiaId" className="sagva-field" defaultValue={articulo?.familiaId ?? ""}>
-              <option value="">Sin familia</option>
-              {familias.map((familia) => (
-                <option key={familia.id} value={familia.id}>
-                  {familia.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="sagva-label">Subfamilia</span>
-            <select
-              name="subfamiliaId"
-              className="sagva-field"
-              defaultValue={articulo?.subfamiliaId ?? ""}
-            >
-              <option value="">Sin subfamilia</option>
-              {subfamilias.map((subfamilia) => (
-                <option key={subfamilia.id} value={subfamilia.id}>
-                  {subfamilia.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
+          <ArticuloClasificacion
+            familias={familias}
+            subfamilias={subfamilias}
+            familiaInicial={articulo?.familiaId ?? ""}
+            subfamiliaInicial={articulo?.subfamiliaId ?? ""}
+          />
           <label>
             <span className="sagva-label">Marca</span>
             <select name="marcaId" className="sagva-field" defaultValue={articulo?.marcaId ?? ""}>
@@ -165,12 +148,8 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
       </section>
 
       <section className="sagva-panel">
-        <div className="sagva-panel-title">Inventario y precios mayoristas</div>
+        <div className="sagva-panel-title">Inventario</div>
         <div className="grid gap-4 p-4 md:grid-cols-4">
-          <label>
-            <span className="sagva-label">Precio mayorista</span>
-            <CampoNumerico name="precioMayorista" defaultValue={Number(precio?.precioMayorista ?? 0)} decimales={2} />
-          </label>
           <label>
             <span className="sagva-label">Stock inicial</span>
             <CampoNumerico name="stockInicial" defaultValue={0} decimales={3} />
@@ -183,10 +162,6 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
             <span className="sagva-label">Stock máximo</span>
             <CampoNumerico name="stockMaximo" defaultValue={Number(articulo?.stockMaximo ?? 0)} decimales={3} />
           </label>
-          <label>
-            <span className="sagva-label">Mínimo mayorista</span>
-            <CampoNumerico name="cantidadMinimaMayorista" defaultValue={Number(precio?.cantidadMinimaMayorista ?? 0)} decimales={3} />
-          </label>
           <label className="md:col-span-4">
             <span className="sagva-label">Comentario</span>
             <textarea
@@ -196,6 +171,28 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
             />
           </label>
         </div>
+      </section>
+
+      <section className="sagva-panel">
+        <div className="sagva-panel-title">Reglas de precios mayoristas</div>
+        <ArticuloReglasMayoristas
+          iniciales={
+            articulo?.reglasMayoristas.length
+              ? articulo.reglasMayoristas.map((regla) => ({
+                  id: regla.id,
+                  cantidadMinima: Number(regla.cantidadMinima),
+                  precioUnitario: Number(regla.precioUnitario)
+                }))
+              : precio && Number(precio.cantidadMinimaMayorista ?? 0) > 0 &&
+                Number(precio.precioMayorista ?? 0) > 0
+                ? [{
+                    id: "regla-legada",
+                    cantidadMinima: Number(precio.cantidadMinimaMayorista),
+                    precioUnitario: Number(precio.precioMayorista)
+                  }]
+                : []
+          }
+        />
       </section>
 
       <div className="flex justify-end gap-3">

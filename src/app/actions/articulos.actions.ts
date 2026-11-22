@@ -23,8 +23,8 @@ function articuloDataFromForm(formData: FormData) {
   return {
     codigoBarra: optionalStringValue(formData, "codigoBarra"),
     nombre: stringValue(formData, "nombre"),
-    familiaId: optionalStringValue(formData, "familiaId"),
-    subfamiliaId: optionalStringValue(formData, "subfamiliaId"),
+    familiaId: stringValue(formData, "familiaId") || null,
+    subfamiliaId: stringValue(formData, "subfamiliaId") || null,
     marcaId: optionalStringValue(formData, "marcaId"),
     unidadMedida: stringValue(formData, "unidadMedida") || "UND",
     cantidadEspecifica: optionalStringValue(formData, "cantidadEspecifica"),
@@ -44,6 +44,62 @@ function vinculacionProveedorFromForm(formData: FormData) {
     throw new Error("Para guardar un código externo debes seleccionar proveedor y completar su código.");
   }
   return proveedorId && codigo ? { proveedorId, codigo } : null;
+}
+
+async function validarFamiliaSubfamilia(familiaId: string | null, subfamiliaId: string | null) {
+  if (!subfamiliaId) return;
+  if (!familiaId) throw new Error("Selecciona una familia antes de elegir subfamilia.");
+  const subfamilia = await prisma.subfamilia.findUnique({
+    where: { id: subfamiliaId },
+    select: { familiaId: true }
+  });
+  if (!subfamilia || subfamilia.familiaId !== familiaId) {
+    throw new Error("La subfamilia seleccionada no pertenece a la familia indicada.");
+  }
+}
+
+type ReglaMayorista = { cantidadMinima: number; precioUnitario: number };
+
+function reglasMayoristasFromForm(formData: FormData): ReglaMayorista[] {
+  const entrada = formData.get("reglasMayoristas");
+  if (typeof entrada !== "string" || entrada.length > 12000) {
+    throw new Error("La lista mayorista está ausente o supera el tamaño permitido.");
+  }
+  let parseado: unknown;
+  try {
+    parseado = JSON.parse(entrada);
+  } catch {
+    throw new Error("Formato inválido de reglas mayoristas.");
+  }
+  if (!Array.isArray(parseado) || parseado.length > 30) {
+    throw new Error("La lista debe contener entre cero y treinta reglas.");
+  }
+
+  const vistos = new Set<number>();
+  const validar = (valor: unknown, decimales: number): number => {
+    if (typeof valor !== "string") throw new Error("Una regla contiene valores no numéricos.");
+    const patron = new RegExp("^\\d{1,12}(?:[.,]\\d{1," + decimales + "})?$");
+    if (!patron.test(valor)) throw new Error("Cantidad o precio mayorista con formato inválido.");
+    const numero = Number(valor.replace(",", "."));
+    if (!Number.isFinite(numero) || numero <= 0 || numero >= 1_000_000_000_000) {
+      throw new Error("La cantidad y el precio mayorista deben ser mayores que cero.");
+    }
+    return numero;
+  };
+
+  return parseado.map((dato: unknown) => {
+    if (!dato || typeof dato !== "object" || Array.isArray(dato)) {
+      throw new Error("Una regla mayorista contiene datos inválidos.");
+    }
+    const registro = dato as Record<string, unknown>;
+    const cantidadMinima = validar(registro.cantidadMinima, 3);
+    const precioUnitario = validar(registro.precioUnitario, 2);
+    if (vistos.has(cantidadMinima)) {
+      throw new Error("No puede haber dos reglas mayoristas con la misma cantidad mínima.");
+    }
+    vistos.add(cantidadMinima);
+    return { cantidadMinima, precioUnitario };
+  }).sort((a, b) => a.cantidadMinima - b.cantidadMinima);
 }
 
 function generarCodigoInterno() {
@@ -76,8 +132,9 @@ function precioDataFromForm(formData: FormData) {
     margen,
     // ILA se guarda en el artículo como referencia tributaria; no altera el precio comercial.
     precioPublico: calcularPrecioPublico(precioConIva, margen),
-    precioMayorista: numeroDecimalValidado(formData, "precioMayorista"),
-    cantidadMinimaMayorista: numeroDecimalValidado(formData, "cantidadMinimaMayorista", 3)
+    // Se conservan columnas anteriores por compatibilidad pero las nuevas reglas van en tabla propia.
+    precioMayorista: null,
+    cantidadMinimaMayorista: null
   };
 }
 
@@ -86,6 +143,8 @@ export async function crearArticuloAction(formData: FormData) {
   const precioData = precioDataFromForm(formData);
   const stockInicial = numeroDecimalValidado(formData, "stockInicial", 3);
   const vinculacion = vinculacionProveedorFromForm(formData);
+  const reglasMayoristas = reglasMayoristasFromForm(formData);
+  await validarFamiliaSubfamilia(articuloData.familiaId, articuloData.subfamiliaId);
 
   if (!articuloData.nombre) {
     redirect("/articulos/nuevo?error=campos");
@@ -97,6 +156,9 @@ export async function crearArticuloAction(formData: FormData) {
     data: {
       ...articuloData,
       codigoProducto: generarCodigoInterno(),
+      reglasMayoristas: reglasMayoristas.length
+        ? { create: reglasMayoristas }
+        : undefined,
       proveedorProductos: vinculacion
         ? {
             create: {
@@ -141,6 +203,8 @@ export async function actualizarArticuloAction(id: string, formData: FormData) {
   const articuloData = articuloDataFromForm(formData);
   const precioData = precioDataFromForm(formData);
   const vinculacion = vinculacionProveedorFromForm(formData);
+  const reglasMayoristas = reglasMayoristasFromForm(formData);
+  await validarFamiliaSubfamilia(articuloData.familiaId, articuloData.subfamiliaId);
 
   await prisma.$transaction(async (tx) => {
     // Consultar desde BD evita que el formulario modifique códigos de otros artículos.
@@ -160,6 +224,14 @@ export async function actualizarArticuloAction(id: string, formData: FormData) {
     await tx.articuloPrecio.create({
       data: { articuloId: id, ...precioData }
     });
+    // Reemplazar las reglas en la misma transacción para que agregar, editar o eliminar
+    // no deje el artículo con una lista parcial en caso de error.
+    await tx.articuloReglaMayorista.deleteMany({ where: { articuloId: id } });
+    if (reglasMayoristas.length > 0) {
+      await tx.articuloReglaMayorista.createMany({
+        data: reglasMayoristas.map((regla) => ({ articuloId: id, ...regla }))
+      });
+    }
 
     for (const asociacion of asociaciones) {
       const codigoNuevo = stringValue(formData, `codigoProveedorExistente_${asociacion.id}`);

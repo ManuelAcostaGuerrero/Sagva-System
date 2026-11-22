@@ -20,6 +20,9 @@ export default async function EditarArticuloPage({
           orderBy: { createdAt: "desc" },
           take: 1
         },
+        reglasMayoristas: {
+          orderBy: { cantidadMinima: "asc" }
+        },
         proveedorProductos: {
           include: { proveedor: true },
           orderBy: { createdAt: "asc" }

@@ -140,6 +140,7 @@ model Articulo {
   comentario          String?
   estado              String                         @default("activo")
   precios             ArticuloPrecio[]
+  reglasMayoristas    ArticuloReglaMayorista[]
   stocks              InventarioStock[]
   movimientos         InventarioMovimiento[]
   proveedorProductos  ProveedorProductoAsociado[]
@@ -168,6 +169,19 @@ model ArticuloPrecio {
   updatedAt                 DateTime @updatedAt @map("updated_at")
 
   @@map("articulo_precios")
+}
+
+model ArticuloReglaMayorista {
+  id             String   @id @default(cuid())
+  articuloId     String   @map("articulo_id")
+  articulo       Articulo @relation(fields: [articuloId], references: [id], onDelete: Cascade)
+  cantidadMinima Decimal  @map("cantidad_minima")
+  precioUnitario Decimal  @map("precio_unitario")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([articuloId, cantidadMinima])
+  @@map("articulo_reglas_mayoristas")
 }
 
 model InventarioStock {
