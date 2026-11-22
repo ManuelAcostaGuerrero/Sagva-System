@@ -29,9 +29,24 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
   return (
     <form action={action} className="space-y-5">
       <section className="sagva-panel">
-        <div className="sagva-panel-title flex flex-wrap items-center justify-between gap-2">
+        <div className="sagva-panel-title grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
           <span>Información del artículo</span>
-          <span className="text-xs font-normal">Código interno SAGVA: {articulo?.codigoProducto ?? "Automático al guardar"}</span>
+          <label className="flex flex-wrap items-center gap-2 md:justify-self-center">
+            <span className="shrink-0 text-xs font-semibold">Tipo de artículo</span>
+            <select
+              name="tipoArticulo"
+              className="sagva-field min-w-32 text-sm font-normal"
+              defaultValue={articulo?.tipoArticulo ?? "PRODUCTO"}
+              required
+            >
+              <option value="PRODUCTO">Producto</option>
+              <option value="ARTICULO">Artículo</option>
+              <option value="PROMOCION">Promoción</option>
+            </select>
+          </label>
+          <span className="text-xs font-normal md:justify-self-end">
+            Código interno SAGVA: {articulo?.codigoProducto ?? "Automático al guardar"}
+          </span>
         </div>
         <div className="grid gap-4 p-4 md:grid-cols-4">
           <label>
@@ -49,15 +64,6 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
               <option value="activo">Activo</option>
               <option value="inactivo">Inactivo</option>
             </select>
-          </label>
-          <label>
-            <span className="sagva-label">Tipo de artículo</span>
-            <select name="tipoArticulo" className="sagva-field" defaultValue={articulo?.tipoArticulo ?? "PRODUCTO"} required>
-              <option value="PRODUCTO">Producto</option>
-              <option value="ARTICULO">Artículo</option>
-              <option value="PROMOCION">Promoción</option>
-            </select>
-            <span className="mt-1 block text-xs text-slate-500">Solo clasificación; las promociones se configurarán en una etapa posterior.</span>
           </label>
           <label className="md:col-span-2">
             <span className="sagva-label">Nombre *</span>
@@ -98,6 +104,9 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
             />
           </label>
         </div>
+        <p className="px-4 pb-3 text-xs text-slate-500">
+          El tipo organiza la ficha. La configuración de componentes y precios de promociones se desarrollará posteriormente.
+        </p>
       </section>
 
       <section className="sagva-panel">
