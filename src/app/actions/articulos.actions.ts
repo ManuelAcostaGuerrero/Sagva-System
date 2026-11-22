@@ -19,10 +19,21 @@ async function ensureSucursalPrincipal() {
   });
 }
 
+const TIPOS_ARTICULO_VALIDOS = new Set(["PRODUCTO", "ARTICULO", "PROMOCION"]);
+
+function tipoArticuloFromForm(formData: FormData) {
+  const tipoArticulo = stringValue(formData, "tipoArticulo") || "PRODUCTO";
+  if (!TIPOS_ARTICULO_VALIDOS.has(tipoArticulo)) {
+    throw new Error("El tipo de artículo debe ser Producto, Artículo o Promoción.");
+  }
+  return tipoArticulo;
+}
+
 function articuloDataFromForm(formData: FormData) {
   return {
     codigoBarra: optionalStringValue(formData, "codigoBarra"),
     nombre: stringValue(formData, "nombre"),
+    tipoArticulo: tipoArticuloFromForm(formData),
     familiaId: stringValue(formData, "familiaId") || null,
     subfamiliaId: stringValue(formData, "subfamiliaId") || null,
     marcaId: optionalStringValue(formData, "marcaId"),

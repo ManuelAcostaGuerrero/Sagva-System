@@ -1,10 +1,11 @@
-import type { EstadoGeneral, TipoImpuesto } from "./global.types";
+import type { EstadoGeneral, TipoArticulo, TipoImpuesto } from "./global.types";
 
 export type ArticuloInput = {
   codigoProducto: string;
   codigoInventario?: string;
   codigoBarra?: string;
   nombre: string;
+  tipoArticulo?: TipoArticulo;
   familiaId?: string;
   subfamiliaId?: string;
   marcaId?: string;

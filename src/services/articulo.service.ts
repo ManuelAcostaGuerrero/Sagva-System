@@ -14,6 +14,7 @@ export const ArticuloService = {
         codigoInventario: datos.codigoInventario,
         codigoBarra: datos.codigoBarra,
         nombre: datos.nombre,
+        tipoArticulo: datos.tipoArticulo ?? "PRODUCTO",
         familiaId: datos.familiaId,
         subfamiliaId: datos.subfamiliaId,
         marcaId: datos.marcaId,

@@ -50,6 +50,15 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
               <option value="inactivo">Inactivo</option>
             </select>
           </label>
+          <label>
+            <span className="sagva-label">Tipo de artículo</span>
+            <select name="tipoArticulo" className="sagva-field" defaultValue={articulo?.tipoArticulo ?? "PRODUCTO"} required>
+              <option value="PRODUCTO">Producto</option>
+              <option value="ARTICULO">Artículo</option>
+              <option value="PROMOCION">Promoción</option>
+            </select>
+            <span className="mt-1 block text-xs text-slate-500">Solo clasificación; las promociones se configurarán en una etapa posterior.</span>
+          </label>
           <label className="md:col-span-2">
             <span className="sagva-label">Nombre *</span>
             <input

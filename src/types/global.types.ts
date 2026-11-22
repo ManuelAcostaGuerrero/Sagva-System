@@ -4,6 +4,8 @@ export type MetodoPago = "efectivo" | "debito" | "credito" | "transferencia" | "
 
 export type TipoImpuesto = "IVA" | "exento" | "impuesto_adicional";
 
+export type TipoArticulo = "PRODUCTO" | "ARTICULO" | "PROMOCION";
+
 export type BaseEntity = {
   id: string;
   createdAt: Date;

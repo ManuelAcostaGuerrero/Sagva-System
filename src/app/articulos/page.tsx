@@ -39,6 +39,7 @@ export default async function ArticulosPage() {
                 <tr>
                   <th>Código</th>
                   <th>Artículo</th>
+                  <th>Tipo</th>
                   <th>Familia</th>
                   <th>Marca</th>
                   <th>Precio público</th>
@@ -58,6 +59,7 @@ export default async function ArticulosPage() {
                     <tr key={articulo.id}>
                       <td className="font-semibold text-slate-900">{articulo.codigoProducto}</td>
                       <td>{articulo.nombre}</td>
+                      <td>{articulo.tipoArticulo === "PROMOCION" ? "Promoción" : articulo.tipoArticulo === "ARTICULO" ? "Artículo" : "Producto"}</td>
                       <td>{articulo.familia?.nombre ?? "-"}</td>
                       <td>{articulo.marca?.nombre ?? "-"}</td>
                       <td>{formatCurrency(Number(precio?.precioPublico ?? 0))}</td>
@@ -81,7 +83,7 @@ export default async function ArticulosPage() {
                 })}
                 {articulos.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-500">
+                    <td colSpan={9} className="py-8 text-center text-slate-500">
                       No hay artículos registrados todavía.
                     </td>
                   </tr>

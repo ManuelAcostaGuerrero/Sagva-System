@@ -125,6 +125,7 @@ model Articulo {
   codigoInventario    String?                        @unique @map("codigo_inventario")
   codigoBarra         String?                        @unique @map("codigo_barra")
   nombre              String
+  tipoArticulo        String                         @default("PRODUCTO") @map("tipo_articulo")
   familiaId           String?                        @map("familia_id")
   familia             Familia?                       @relation(fields: [familiaId], references: [id])
   subfamiliaId        String?                        @map("subfamilia_id")

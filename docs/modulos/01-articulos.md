@@ -11,6 +11,7 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 ## Qué incluye
 
 - Registro de artículos.
+- Campo **Tipo de artículo**: PRODUCTO, ARTICULO o PROMOCION, independiente de impuestos y con valor inicial PRODUCTO para artículos existentes.
 - Código interno de producto generado automáticamente por SAGVA, no editable.
 - Código de barras ingresado manualmente o mediante escáner.
 - Códigos de proveedor asociados a cada artículo y a su proveedor específico.
@@ -51,6 +52,7 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 | articulo_id | Identificador técnico interno (Prisma/SQLite) |
 | codigo_producto | Código comercial interno generado por SAGVA y no editable |
 | codigo_barra | Código de barras capturado o ingresado |
+| tipo_articulo | PRODUCTO, ARTICULO o PROMOCION; no define impuestos ni genera combos automáticamente |
 | proveedor_productos_asociados | Asociación proveedor + código externo + artículo, varios por artículo |
 | codigo_inventario | Campo anterior conservado en BD por compatibilidad; no se captura en el formulario |
 | familia_id | Familia del artículo |
@@ -98,6 +100,10 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 
 ## Integraciones
 
+- El tipo de artículo se conserva al crear o editar y aparece en el listado general.
+- PROMOCION es, por ahora, una clasificación. No genera componentes, precios promocionales ni descuenta inventario hasta implementar el flujo de promociones.
+- El tipo de artículo no altera los cálculos de IVA, ILA ni el precio público.
+
 - Inventario utiliza el `articuloId` y la sucursal, sin depender de un código de inventario adicional.
 - Venta consulta artículo, precio y estado.
 - Facturas asocia productos facturados con artículo interno.
@@ -106,6 +112,8 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 
 ## Pendientes
 
+- Definir después la diferencia funcional entre PRODUCTO y ARTICULO.
+- Diseñar la construcción manual de promociones con artículos previamente migrados; no importar promociones del sistema anterior.
 - Completar la búsqueda y asociación de artículos por código del proveedor o código de barras desde el ingreso real de facturas.
 - Validar las asociaciones en el equipo local con datos de prueba antes de actualizar la instalación productiva.
 - Validar la creación de tabla mayorista adicional en una copia de SQLite, sin ejecutar migraciones sobre datos reales.
