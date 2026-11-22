@@ -113,7 +113,7 @@ export function ArticuloPreciosImpuestos({
         </select>
       </label>
       <label className="md:col-span-3">
-        <span className="sagva-label">Impuesto adicional de bebidas (ILA)</span>
+        <span className="sagva-label">Impuesto adicional (ILA)</span>
         <select
           name="impuestoAdicional"
           className="sagva-field"
