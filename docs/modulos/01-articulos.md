@@ -11,8 +11,9 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 ## Qué incluye
 
 - Registro de artículos.
-- Código de producto e inventario.
-- Código de barra manual o automático.
+- Código interno de producto generado automáticamente por SAGVA, no editable.
+- Código de barras ingresado manualmente o mediante escáner.
+- Códigos de proveedor asociados a cada artículo y a su proveedor específico.
 - Familia y subfamilia.
 - Marca.
 - Tipo de impuesto.
@@ -45,9 +46,11 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 
 | Campo | Descripción |
 |---|---|
-| articulo_id | Código principal del artículo |
-| codigo_inventario | Código usado por inventario |
-| codigo_barra | Código de barra manual o automático |
+| articulo_id | Identificador técnico interno (Prisma/SQLite) |
+| codigo_producto | Código comercial interno generado por SAGVA y no editable |
+| codigo_barra | Código de barras capturado o ingresado |
+| proveedor_productos_asociados | Asociación proveedor + código externo + artículo, varios por artículo |
+| codigo_inventario | Campo anterior conservado en BD por compatibilidad; no se captura en el formulario |
 | familia_id | Familia del artículo |
 | subfamilia_id | Subfamilia dependiente |
 | marca_id | Marca del producto |
@@ -71,18 +74,24 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 2. Si se ingresa precio sin IVA, calcular precio con IVA.
 3. Si se activa impuesto adicional, recalcular precios.
 4. Si cambia el margen, recalcular precio público.
-5. Si no existe código de barra, generar uno secuencial disponible.
-6. No permitir códigos duplicados.
+5. Al crear un artículo, generar un código `ART-` único. Conservar los códigos existentes.
+6. Mantener el código de barras independiente del código del proveedor.
+7. El código externo se identifica por proveedor + código (no es único globalmente).
+8. Permitir varios códigos externos asociados a un mismo artículo, sin duplicar el inventario.
+9. No reasignar a otro artículo un código externo ya asociado dentro del mismo proveedor.
 
 ## Integraciones
 
-- Inventario consulta artículo y códigos.
+- Inventario utiliza el `articuloId` y la sucursal, sin depender de un código de inventario adicional.
 - Venta consulta artículo, precio y estado.
 - Facturas asocia productos facturados con artículo interno.
 - Proveedores asocia productos externos con artículos internos.
 - Ensamblaje consulta artículos como componentes.
 
 ## Pendientes
+
+- Completar la búsqueda y asociación de artículos por código del proveedor o código de barras desde el ingreso real de facturas.
+- Validar las asociaciones en el equipo local con datos de prueba antes de actualizar la instalación productiva.
 
 - Definir estados finales del artículo.
 - Definir fórmula exacta para artículo exento + impuesto adicional.

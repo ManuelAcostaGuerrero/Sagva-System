@@ -11,7 +11,7 @@ export default async function EditarArticuloPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
-  const [articulo, familias, subfamilias, marcas] = await Promise.all([
+  const [articulo, familias, subfamilias, marcas, proveedores] = await Promise.all([
     prisma.articulo.findUnique({
       where: { id: resolvedParams.id },
       include: {
@@ -19,12 +19,17 @@ export default async function EditarArticuloPage({
           where: { vigente: true },
           orderBy: { createdAt: "desc" },
           take: 1
+        },
+        proveedorProductos: {
+          include: { proveedor: true },
+          orderBy: { createdAt: "asc" }
         }
       }
     }),
     prisma.familia.findMany({ orderBy: { nombre: "asc" } }),
     prisma.subfamilia.findMany({ orderBy: { nombre: "asc" } }),
-    prisma.marca.findMany({ orderBy: { nombre: "asc" } })
+    prisma.marca.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.proveedor.findMany({ where: { estado: "activo" }, orderBy: { razonSocial: "asc" } })
   ]);
 
   if (!articulo) {
@@ -38,6 +43,7 @@ export default async function EditarArticuloPage({
         familias={familias}
         subfamilias={subfamilias}
         marcas={marcas}
+        proveedores={proveedores}
       />
     </AppShell>
   );

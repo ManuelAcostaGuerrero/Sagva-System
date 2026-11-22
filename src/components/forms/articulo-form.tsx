@@ -1,19 +1,21 @@
-import type { Articulo, ArticuloPrecio, Familia, Marca, Subfamilia } from "@prisma/client";
+import type { Articulo, ArticuloPrecio, Familia, Marca, Proveedor, ProveedorProductoAsociado, Subfamilia } from "@prisma/client";
 import { Save } from "lucide-react";
 import { crearArticuloAction, actualizarArticuloAction } from "@/app/actions/articulos.actions";
 
 type ArticuloWithPrecio = Articulo & {
   precios: ArticuloPrecio[];
+  proveedorProductos: Array<ProveedorProductoAsociado & { proveedor: Proveedor }>;
 };
 
 type ArticuloFormProps = {
   familias: Familia[];
   subfamilias: Subfamilia[];
   marcas: Marca[];
+  proveedores: Proveedor[];
   articulo?: ArticuloWithPrecio;
 };
 
-export function ArticuloForm({ familias, subfamilias, marcas, articulo }: ArticuloFormProps) {
+export function ArticuloForm({ familias, subfamilias, marcas, proveedores, articulo }: ArticuloFormProps) {
   const precio = articulo?.precios?.[0];
   const action = articulo
     ? actualizarArticuloAction.bind(null, articulo.id)
@@ -25,28 +27,21 @@ export function ArticuloForm({ familias, subfamilias, marcas, articulo }: Articu
         <div className="sagva-panel-title">Información del artículo</div>
         <div className="grid gap-4 p-4 md:grid-cols-4">
           <label>
-            <span className="sagva-label">Código producto *</span>
+            <span className="sagva-label">Código interno SAGVA</span>
             <input
-              name="codigoProducto"
-              className="sagva-field"
-              defaultValue={articulo?.codigoProducto ?? ""}
-              required
+              className="sagva-field bg-slate-100"
+              value={articulo?.codigoProducto ?? "Automático al guardar"}
+              readOnly
+              aria-label="Código interno generado por SAGVA"
             />
           </label>
           <label>
-            <span className="sagva-label">Código inventario</span>
-            <input
-              name="codigoInventario"
-              className="sagva-field"
-              defaultValue={articulo?.codigoInventario ?? ""}
-            />
-          </label>
-          <label>
-            <span className="sagva-label">Código barra</span>
+            <span className="sagva-label">Código de barras</span>
             <input
               name="codigoBarra"
               className="sagva-field"
               defaultValue={articulo?.codigoBarra ?? ""}
+              placeholder="Escanear o escribir"
             />
           </label>
           <label>
@@ -136,6 +131,45 @@ export function ArticuloForm({ familias, subfamilias, marcas, articulo }: Articu
               defaultValue={Number(articulo?.impuestoAdicional ?? 0)}
             />
           </label>
+        </div>
+      </section>
+
+      <section className="sagva-panel">
+        <div className="sagva-panel-title">Códigos por proveedor</div>
+        <div className="grid gap-4 p-4 md:grid-cols-2">
+          {articulo?.proveedorProductos.map((asociacion) => (
+            <label key={asociacion.id}>
+              <span className="sagva-label">Código en {asociacion.proveedor.nombreComercial || asociacion.proveedor.razonSocial}</span>
+              <input
+                name={`codigoProveedorExistente_${asociacion.id}`}
+                className="sagva-field"
+                defaultValue={asociacion.productoProveedorCodigo}
+                required
+              />
+            </label>
+          ))}
+          <label>
+            <span className="sagva-label">Proveedor para nueva asociación</span>
+            <select name="proveedorId" className="sagva-field" defaultValue="">
+              <option value="">Sin nuevo proveedor</option>
+              {proveedores.map((proveedor) => (
+                <option key={proveedor.id} value={proveedor.id}>
+                  {proveedor.nombreComercial || proveedor.razonSocial}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="sagva-label">Código del proveedor</span>
+            <input
+              name="codigoProveedor"
+              className="sagva-field"
+              placeholder="Código que figura en su factura"
+            />
+          </label>
+          <p className="md:col-span-2 text-xs text-slate-500">
+            El código pertenece al proveedor seleccionado, no al inventario. Un artículo puede tener códigos diferentes en varios proveedores.
+          </p>
         </div>
       </section>
 

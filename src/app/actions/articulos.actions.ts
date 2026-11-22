@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -20,8 +21,6 @@ async function ensureSucursalPrincipal() {
 
 function articuloDataFromForm(formData: FormData) {
   return {
-    codigoProducto: stringValue(formData, "codigoProducto"),
-    codigoInventario: optionalStringValue(formData, "codigoInventario"),
     codigoBarra: optionalStringValue(formData, "codigoBarra"),
     nombre: stringValue(formData, "nombre"),
     familiaId: optionalStringValue(formData, "familiaId"),
@@ -36,6 +35,20 @@ function articuloDataFromForm(formData: FormData) {
     comentario: optionalStringValue(formData, "comentario"),
     estado: stringValue(formData, "estado") || "activo"
   };
+}
+
+function vinculacionProveedorFromForm(formData: FormData) {
+  const proveedorId = stringValue(formData, "proveedorId");
+  const codigo = stringValue(formData, "codigoProveedor");
+  if (Boolean(proveedorId) !== Boolean(codigo)) {
+    throw new Error("Para guardar un código externo debes seleccionar proveedor y completar su código.");
+  }
+  return proveedorId && codigo ? { proveedorId, codigo } : null;
+}
+
+function generarCodigoInterno() {
+  // No depende del número de artículos: no se repiten códigos al eliminar registros.
+  return `ART-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
 }
 
 function precioDataFromForm(formData: FormData) {
@@ -61,8 +74,9 @@ export async function crearArticuloAction(formData: FormData) {
   const articuloData = articuloDataFromForm(formData);
   const precioData = precioDataFromForm(formData);
   const stockInicial = numberValue(formData, "stockInicial", 0);
+  const vinculacion = vinculacionProveedorFromForm(formData);
 
-  if (!articuloData.codigoProducto || !articuloData.nombre) {
+  if (!articuloData.nombre) {
     redirect("/articulos/nuevo?error=campos");
   }
 
@@ -71,6 +85,16 @@ export async function crearArticuloAction(formData: FormData) {
   const articulo = await prisma.articulo.create({
     data: {
       ...articuloData,
+      codigoProducto: generarCodigoInterno(),
+      proveedorProductos: vinculacion
+        ? {
+            create: {
+              proveedorId: vinculacion.proveedorId,
+              productoProveedorCodigo: vinculacion.codigo,
+              productoProveedorNombre: articuloData.nombre
+            }
+          }
+        : undefined,
       precios: {
         create: precioData
       },
@@ -105,23 +129,64 @@ export async function crearArticuloAction(formData: FormData) {
 export async function actualizarArticuloAction(id: string, formData: FormData) {
   const articuloData = articuloDataFromForm(formData);
   const precioData = precioDataFromForm(formData);
+  const vinculacion = vinculacionProveedorFromForm(formData);
 
-  await prisma.$transaction([
-    prisma.articulo.update({
+  await prisma.$transaction(async (tx) => {
+    // Consultar desde BD evita que el formulario modifique códigos de otros artículos.
+    const asociaciones = await tx.proveedorProductoAsociado.findMany({
+      where: { articuloId: id },
+      select: { id: true, productoProveedorCodigo: true }
+    });
+
+    await tx.articulo.update({
       where: { id },
       data: articuloData
-    }),
-    prisma.articuloPrecio.updateMany({
+    });
+    await tx.articuloPrecio.updateMany({
       where: { articuloId: id },
       data: { vigente: false }
-    }),
-    prisma.articuloPrecio.create({
-      data: {
-        articuloId: id,
-        ...precioData
+    });
+    await tx.articuloPrecio.create({
+      data: { articuloId: id, ...precioData }
+    });
+
+    for (const asociacion of asociaciones) {
+      const codigoNuevo = stringValue(formData, `codigoProveedorExistente_${asociacion.id}`);
+      if (!codigoNuevo) {
+        throw new Error("Los códigos existentes de proveedor no pueden quedar vacíos.");
       }
-    })
-  ]);
+      if (codigoNuevo !== asociacion.productoProveedorCodigo) {
+        await tx.proveedorProductoAsociado.update({
+          where: { id: asociacion.id },
+          data: { productoProveedorCodigo: codigoNuevo }
+        });
+      }
+    }
+
+    if (vinculacion) {
+      const existente = await tx.proveedorProductoAsociado.findUnique({
+        where: {
+          proveedorId_productoProveedorCodigo: {
+            proveedorId: vinculacion.proveedorId,
+            productoProveedorCodigo: vinculacion.codigo
+          }
+        }
+      });
+      if (existente && existente.articuloId !== id) {
+        throw new Error("Este código del proveedor ya corresponde a otro artículo.");
+      }
+      if (!existente) {
+        await tx.proveedorProductoAsociado.create({
+          data: {
+            articuloId: id,
+            proveedorId: vinculacion.proveedorId,
+            productoProveedorCodigo: vinculacion.codigo,
+            productoProveedorNombre: articuloData.nombre
+          }
+        });
+      }
+    }
+  });
 
   revalidatePath("/articulos");
   revalidatePath(`/articulos/${id}/editar`);
