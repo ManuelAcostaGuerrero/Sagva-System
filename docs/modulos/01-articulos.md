@@ -133,3 +133,14 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 - **Marca** es independiente de familia/subfamilia y no se asigna automáticamente.
 - **Importación planificada desde Excel:** importar únicamente FAMILIA; crearla si no existe o reutilizarla si existe. No importar SUBFAMILIA por ahora; dejarla sin asignar para clasificación posterior. Las PROMOCIONES tampoco se importan, se construirán manualmente luego.
 - Esta decisión documenta el alcance de la futura importación; todavía no ejecuta la importación de artículos ni modifica SQLite.
+
+
+## Importación del catálogo antiguo
+
+- Conservar `ID` de origen exactamente como `codigoProducto` visible, manteniendo `Articulo.id` técnico independiente. Solo tomar `CODIGO BARRA` como código comercial; no tomar `CODIGO`.
+- Importar PRODUCTO y ARTICULO. No importar PROMOCION: se crearán desde SAGVA posteriormente.
+- Los EXENTOS de familias CIGARROS y TABAQUERIA se transforman en tipo PRODUCTO con `tipoImpuesto="IVA_RETENIDO"`. Los demás EXENTOS quedan pendientes de revisión.
+- Importar solo FAMILIA y reutilizarla si ya existe; crearla si falta. Dejar SUBFAMILIA y MARCA realmente vacías, sin valor predeterminado. Se asignarán después.
+- Mantener NOMBRE y ACTIVO SI/NO. Forzar unidad `UNIDAD`. Llevar solamente stock positivo de Casa Matriz a la sucursal verificada; negativos se convierten en cero con advertencia.
+- Guardar `PRECIO` exactamente como precio público (no recalcularlo con MARGEN). Guardar `COSTO` como costo sin IVA, calcular costo con IVA al 19% y derivar recargo sobre dicho costo. No importar `MARGEN` ni `VENTA_NETO` del Excel.
+- El importador es una utilidad manual con análisis previo, controles de colisiones e informe de casos pendientes. No se importa durante `git pull`, actualización ni apertura de SAGVA.

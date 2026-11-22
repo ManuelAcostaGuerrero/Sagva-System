@@ -2,7 +2,7 @@ export type EstadoGeneral = "activo" | "inactivo" | "pendiente" | "anulado" | "c
 
 export type MetodoPago = "efectivo" | "debito" | "credito" | "transferencia" | "mixto";
 
-export type TipoImpuesto = "IVA" | "exento" | "impuesto_adicional";
+export type TipoImpuesto = "IVA" | "exento" | "impuesto_adicional" | "IVA_RETENIDO";
 
 export type TipoArticulo = "PRODUCTO" | "ARTICULO" | "PROMOCION";
 

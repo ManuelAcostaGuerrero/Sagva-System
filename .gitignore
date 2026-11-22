@@ -39,3 +39,8 @@ tsconfig.tsbuildinfo
 *.db-wal
 *.db-shm
 *.db-journal
+
+# archivos privados de migración (no subir datos comerciales)
+SAGVA_articulos_migracion_privada.json
+datos_migracion/
+reportes-importacion/

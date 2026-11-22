@@ -107,6 +107,7 @@ export function ArticuloPreciosImpuestos({
         <select name="tipoImpuesto" className="sagva-field" value={tipoImpuesto} onChange={(event) => cambiarTipo(event.target.value)}>
           <option value="IVA">Afecto a IVA (19%)</option>
           <option value="exento">Exento de IVA (0%)</option>
+          <option value="IVA_RETENIDO">IVA retenido por cambio de sujeto (compra con IVA)</option>
           {tipoImpuesto === "impuesto_adicional" ? (
             <option value="impuesto_adicional">IVA + adicional (registro anterior)</option>
           ) : null}

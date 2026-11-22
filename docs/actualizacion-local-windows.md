@@ -55,3 +55,20 @@ En cada computador instalado:
 No se debe forzar la actualizacion. Primero hay que revisar los archivos indicados por el actualizador y decidir si esos cambios deben guardarse en Git, descartarse o respaldarse por separado.
 
 Este comportamiento es intencional para evitar perdida accidental de codigo o configuracion no ignorada.
+
+
+## Importación manual de artículos desde Excel de 22-11-2026
+
+La actualización de GitHub **NO importa automáticamente** los productos en SQLite.
+
+1. Descargar por separado el archivo privado `SAGVA_articulos_migracion_privada.json` de la conversación ChatGPT. Guardarlo en la carpeta local de `Sagva-System`. Este archivo está ignorado por Git.
+2. Cerrar SAGVA y ejecutar `ACTUALIZAR_SAGVA.bat`. Verificar copia de respaldo y que las migraciones de estructura de `tipo_articulo` estén aplicadas.
+3. Comprobar que la sucursal `principal` en SAGVA corresponde a **Casa Matriz**, porque el stock del Excel corresponde a esa ubicación. Si no corresponde, no utilizar el código por defecto.
+4. Analizar SIN importar con: `npm run importar:articulos -- --archivo=SAGVA_articulos_migracion_privada.json --sucursal=principal`.
+5. Revisar el reporte generado en `reportes-importacion/`. El importador compara los códigos con SQLite y no modifica artículos existentes.
+6. Si los candidatos y la sucursal son correctos, ejecutar: `npm run importar:articulos -- --archivo=SAGVA_articulos_migracion_privada.json --sucursal=principal --aplicar`.
+7. El importador crea su propio respaldo SQLite coherente con `VACUUM INTO` en `backups/migracion-articulos/` antes de grabar el primer registro. Si un artículo falla, queda reportado sin eliminar los ya cargados. Repetir la operación no duplica artículos importados previamente.
+
+Los registros de Excel que no pasan validación quedan pendientes para revisión. Se importan **solo** PRODUCTO, ARTICULO y EXENTOS de las familias CIGARROS/TABAQUERIA; se omiten las promociones. Los identificadores son el ID original; las familias se crean si faltan; subfamilia y marca quedan sin asignar. Se mantiene el precio público original de forma literal. El costo es el costo neto y se deriva costo con IVA (19%) y recargo. Valores de costo/venta incoherentes requieren revisión.
+
+**No** copiar el JSON a GitHub, ni activar la importación en el inicio del sistema, ni ejecutarla automáticamente en el actualizador. El tipo tributario `IVA_RETENIDO` identifica una clasificación para futuras operaciones; la emisión tributaria/ticket de venta se debe integrar y verificar por separado.
