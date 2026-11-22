@@ -1,21 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CreditCard, Plus, Trash2, X } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { guardarVentaAction } from "./actions";
+import { buscarProductosParaCajaAction, type ProductoBusquedaVenta } from "./buscar-productos";
+import { precioPorCantidad } from "@/lib/venta-precios";
 
-type ProductoVenta = {
-  articuloId: string;
-  codigoProducto: string;
-  codigoBarra: string | null;
-  nombreArticulo: string;
-  precioPublico: number;
-  stockDisponible: number;
-  controlaStock: boolean;
-};
+type ProductoVenta = ProductoBusquedaVenta;
 
 type CajaActiva = {
   id: string;
@@ -31,6 +24,8 @@ type LineaVenta = {
   nombreArticulo: string;
   cantidad: number;
   precioUnitario: number;
+  precioPublico: number;
+  reglasMayoristas: ProductoVenta["reglasMayoristas"];
   descuentoTipo: TipoDescuento;
   descuentoValor: number;
   descuento: number;
@@ -55,21 +50,15 @@ type VentaTemporal = {
   montoPago: string;
 };
 
-type DialogoDescuento = {
-  articuloId: string;
-  nombreArticulo: string;
-};
-
 type NuevaVentaClientProps = {
   productos: ProductoVenta[];
+  puedeAutorizarDescuento: boolean;
   cajaActiva: CajaActiva;
   sucursalId: string;
   sucursalNombre: string;
 };
 
 const metodosPago = ["EFECTIVO", "DEBITO", "CREDITO", "TRANSFERENCIA"];
-const DESCUENTOS_REQUIEREN_AUTORIZACION = true;
-const PIN_DESCUENTO_TEMPORAL = ["12", "34"].join("");
 const MAX_DESCUENTO_PORCENTAJE_TEMPORAL = 100;
 
 function money(value: number) {
@@ -118,17 +107,19 @@ function recalcularLinea(linea: LineaVenta): LineaVenta {
 
 export function VentasNuevaClient({
   productos,
+  puedeAutorizarDescuento,
   cajaActiva,
   sucursalId,
   sucursalNombre,
 }: NuevaVentaClientProps) {
-  const router = useRouter();
   const [errorVenta, setErrorVenta] = useState("");
+  const [resultadosBusqueda, setResultadosBusqueda] = useState<ProductoVenta[]>(productos);
+  const [buscando, setBuscando] = useState(false);
+  const [enviandoVenta, setEnviandoVenta] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const quickMetodoInputRef = useRef<HTMLInputElement>(null);
   const efectivoRecibidoInputRef = useRef<HTMLInputElement>(null);
   const efectivoInputRef = useRef<HTMLInputElement>(null);
-  const pinDescuentoInputRef = useRef<HTMLInputElement>(null);
   const descuentoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const primeraVentaRef = useRef(crearVentaTemporal(1));
 
@@ -137,10 +128,6 @@ export function VentasNuevaClient({
   const [ventaActivaId, setVentaActivaId] = useState(() => primeraVentaRef.current.id);
   const [efectivoRecibido, setEfectivoRecibido] = useState("");
   const [dialogoEfectivoAbierto, setDialogoEfectivoAbierto] = useState(false);
-  const [dialogoDescuento, setDialogoDescuento] = useState<DialogoDescuento | null>(null);
-  const [pinDescuento, setPinDescuento] = useState("");
-  const [errorPinDescuento, setErrorPinDescuento] = useState("");
-  const [descuentosAutorizados, setDescuentosAutorizados] = useState<Record<string, boolean>>({});
   const [bannerVuelto, setBannerVuelto] = useState<{ pago: number; vuelto: number } | null>(null);
 
   const ventaActiva = ventas.find((venta) => venta.id === ventaActivaId) ?? ventas[0];
@@ -151,19 +138,48 @@ export function VentasNuevaClient({
   const metodoPago = ventaActiva?.metodoPago ?? "EFECTIVO";
   const montoPago = ventaActiva?.montoPago ?? "";
 
-  const productosFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return [];
+  // Consultar SQLite mientras se escribe, sin precargar miles de productos ni recargar la página.
+  useEffect(() => {
+    const q = busqueda.trim();
+    if (!q) {
+      setResultadosBusqueda([]);
+      setBuscando(false);
+      return;
+    }
+    let cancelado = false;
+    setBuscando(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const encontrados = await buscarProductosParaCajaAction(q, sucursalId);
+        if (!cancelado) setResultadosBusqueda(encontrados);
+      } catch {
+        if (!cancelado) {
+          setResultadosBusqueda([]);
+          setErrorVenta("No se pudo consultar el catálogo. Vuelve a intentarlo.");
+        }
+      } finally {
+        if (!cancelado) setBuscando(false);
+      }
+    }, 180);
+    return () => { cancelado = true; clearTimeout(timeout); };
+  }, [busqueda, sucursalId]);
 
-    return productos
-      .filter((producto) =>
-        [producto.codigoProducto, producto.codigoBarra ?? "", producto.nombreArticulo]
-          .join(" ")
-          .toLowerCase()
-          .includes(q),
-      )
-      .slice(0, 8);
-  }, [busqueda, productos]);
+  const productosFiltrados = resultadosBusqueda;
+
+  async function confirmarBusquedaConEnter() {
+    const q = busqueda.trim();
+    if (!q) return;
+    try {
+      const encontrados = await buscarProductosParaCajaAction(q, sucursalId);
+      setResultadosBusqueda(encontrados);
+      const exacto = encontrados.find(p => p.codigoBarra === q || p.codigoProducto === q);
+      const elegido = exacto ?? encontrados[0];
+      if (elegido) agregarProducto(elegido);
+      else setErrorVenta("No existe un artículo activo con ese código o nombre.");
+    } catch {
+      setErrorVenta("Error al buscar el código. Intenta nuevamente.");
+    }
+  }
 
   const subtotal = useMemo(
     () => lineas.reduce((sum, linea) => sum + linea.cantidad * linea.precioUnitario, 0),
@@ -220,11 +236,6 @@ export function VentasNuevaClient({
   }, [dialogoEfectivoAbierto]);
 
   useEffect(() => {
-    if (!dialogoDescuento) return;
-    setTimeout(() => pinDescuentoInputRef.current?.focus(), 50);
-  }, [dialogoDescuento]);
-
-  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.ctrlKey || event.altKey || event.metaKey) return;
       if (!["F2", "F6", "F8", "F10"].includes(event.key)) return;
@@ -241,11 +252,16 @@ export function VentasNuevaClient({
   });
 
   async function enviarVenta(formData: FormData) {
+    if (enviandoVenta) return;
+    setEnviandoVenta(true);
     setErrorVenta("");
-    const resultado = await guardarVentaAction(formData);
-    if (resultado?.error) {
-      setErrorVenta(resultado.error);
-      router.refresh();
+    try {
+      const resultado = await guardarVentaAction(formData);
+      if (resultado?.error) setErrorVenta(resultado.error);
+    } catch {
+      setErrorVenta("No se pudo guardar la venta. Comprueba el historial antes de volver a cobrar.");
+    } finally {
+      setEnviandoVenta(false);
     }
   }
 
@@ -270,7 +286,6 @@ export function VentasNuevaClient({
     setBusqueda("");
     setEfectivoRecibido("");
     setDialogoEfectivoAbierto(false);
-    setDialogoDescuento(null);
     limpiarCobroRapido();
   }
 
@@ -291,6 +306,11 @@ export function VentasNuevaClient({
     setErrorVenta("");
     setBannerVuelto(null);
     limpiarCobroRapido();
+    const existenteActual = lineas.find(linea => linea.articuloId === producto.articuloId);
+    if (producto.stockDisponible <= (existenteActual?.cantidad ?? 0)) {
+      setErrorVenta("Stock insuficiente para agregar " + producto.nombreArticulo + ".");
+      return;
+    }
     actualizarVentaActiva((venta) => {
       const existente = venta.lineas.find((linea) => linea.articuloId === producto.articuloId);
 
@@ -298,7 +318,10 @@ export function VentasNuevaClient({
         return {
           ...venta,
           lineas: venta.lineas.map((linea) =>
-            linea.articuloId === producto.articuloId ? recalcularLinea({ ...linea, cantidad: linea.cantidad + 1 }) : linea,
+            linea.articuloId === producto.articuloId ? recalcularLinea({
+              ...linea, cantidad: linea.cantidad + 1,
+              precioUnitario: precioPorCantidad(linea.precioPublico, linea.cantidad + 1, linea.reglasMayoristas)
+            }) : linea,
           ),
         };
       }
@@ -312,11 +335,13 @@ export function VentasNuevaClient({
             codigoProducto: producto.codigoProducto,
             nombreArticulo: producto.nombreArticulo,
             cantidad: 1,
-            precioUnitario: producto.precioPublico,
+            precioUnitario: precioPorCantidad(producto.precioPublico, 1, producto.reglasMayoristas),
+            precioPublico: producto.precioPublico,
+            reglasMayoristas: producto.reglasMayoristas,
             descuentoTipo: "monto",
             descuentoValor: 0,
             descuento: 0,
-            totalLinea: producto.precioPublico,
+            totalLinea: precioPorCantidad(producto.precioPublico, 1, producto.reglasMayoristas),
             stockDisponible: producto.stockDisponible,
           },
         ],
@@ -329,41 +354,24 @@ export function VentasNuevaClient({
     actualizarVentaActiva((venta) => ({
       ...venta,
       lineas: venta.lineas.map((linea) =>
-        linea.articuloId === articuloId ? recalcularLinea({ ...linea, cantidad: Math.max(cantidad, 1) }) : linea,
+        linea.articuloId === articuloId ? recalcularLinea({
+          ...linea,
+          cantidad: Math.min(Math.max(Number.isFinite(cantidad) ? cantidad : 1, 1), linea.stockDisponible),
+          precioUnitario: precioPorCantidad(linea.precioPublico,
+            Math.min(Math.max(Number.isFinite(cantidad) ? cantidad : 1, 1), linea.stockDisponible),
+            linea.reglasMayoristas)
+        }) : linea,
       ),
     }));
   }
 
-  function descuentoEstaAutorizado(articuloId: string) {
-    return !DESCUENTOS_REQUIEREN_AUTORIZACION || descuentosAutorizados[articuloId];
+  function descuentoEstaAutorizado(_articuloId: string) {
+    return puedeAutorizarDescuento;
   }
 
-  function solicitarAutorizacionDescuento(linea: LineaVenta) {
-    if (descuentoEstaAutorizado(linea.articuloId)) return true;
-    setDialogoDescuento({ articuloId: linea.articuloId, nombreArticulo: linea.nombreArticulo });
-    setPinDescuento("");
-    setErrorPinDescuento("");
+  function solicitarAutorizacionDescuento(_linea: LineaVenta) {
+    setErrorVenta("Solo un administrador o usuario autorizado puede aplicar descuentos.");
     return false;
-  }
-
-  function confirmarAutorizacionDescuento() {
-    if (!dialogoDescuento) return;
-
-    if (pinDescuento !== PIN_DESCUENTO_TEMPORAL) {
-      setErrorPinDescuento("PIN incorrecto.");
-      return;
-    }
-
-    const articuloId = dialogoDescuento.articuloId;
-    setDescuentosAutorizados((current) => ({ ...current, [articuloId]: true }));
-    setDialogoDescuento(null);
-    setPinDescuento("");
-    setErrorPinDescuento("");
-    setTimeout(() => {
-      const input = descuentoInputRefs.current[articuloId];
-      input?.focus();
-      input?.select();
-    }, 50);
   }
 
   function cambiarTipoDescuento(articuloId: string, descuentoTipo: TipoDescuento) {
@@ -395,11 +403,7 @@ export function VentasNuevaClient({
       ...venta,
       lineas: venta.lineas.filter((linea) => linea.articuloId !== articuloId),
     }));
-    setDescuentosAutorizados((current) => {
-      const next = { ...current };
-      delete next[articuloId];
-      return next;
-    });
+
   }
 
   function limpiarVenta() {
@@ -415,8 +419,6 @@ export function VentasNuevaClient({
     setBusqueda("");
     setEfectivoRecibido("");
     setDialogoEfectivoAbierto(false);
-    setDialogoDescuento(null);
-    setDescuentosAutorizados({});
     setBannerVuelto(null);
     limpiarCobroRapido();
   }
@@ -461,7 +463,7 @@ export function VentasNuevaClient({
   }
 
   function iniciarCobroRapido(metodo: string) {
-    if (!puedeCobroRapido) return;
+    if (!puedeCobroRapido || enviandoVenta) return;
     setBannerVuelto(null);
 
     if (metodo === "efectivo") {
@@ -544,9 +546,15 @@ export function VentasNuevaClient({
         </Link>
       </div>
 
-      <form ref={formRef} action={enviarVenta} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
+      <form ref={formRef} action={enviarVenta}
+        onKeyDown={(event) => {
+          // Enter confirma el control activo, pero jamás cobra una venta por accidente.
+          if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();
+        }}
+        className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
         {errorVenta ? <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800 xl:col-span-2">{errorVenta}</div> : null}
         <input type="hidden" name="sucursalId" value={sucursalId} />
+        <input type="hidden" name="idempotencyKey" value={ventaActiva.id} />
         <input type="hidden" name="cajaId" value={cajaActiva?.id ?? ""} />
         <input type="hidden" name="cliente" value={cliente} />
         <input type="hidden" name="observacion" value={observacion} />
@@ -591,7 +599,14 @@ export function VentasNuevaClient({
                   className="sagva-field"
                   value={busqueda}
                   onChange={(event) => setBusqueda(event.target.value)}
-                  placeholder="Buscar por nombre o código de barras"
+                  placeholder="Buscar por nombre, código interno o código de barras"
+                  autoComplete="off"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void confirmarBusquedaConEnter();
+                    }
+                  }}
                 />
 
                 {busqueda.trim() ? (
@@ -603,6 +618,7 @@ export function VentasNuevaClient({
                           key={producto.articuloId}
                           type="button"
                           onClick={() => agregarProducto(producto)}
+                          disabled={sinStock}
                           className={`flex w-full items-center justify-between gap-4 border-b px-4 py-3 text-left last:border-b-0 ${
                             sinStock ? "border-amber-200 bg-amber-50 hover:bg-amber-100" : "border-[#eef2f7] hover:bg-blue-50"
                           }`}
@@ -633,13 +649,15 @@ export function VentasNuevaClient({
                     })}
 
                     {productosFiltrados.length === 0 ? (
-                      <div className="px-4 py-5 text-sm text-slate-500">No se encontraron productos para esa búsqueda.</div>
+                      <div className="px-4 py-5 text-sm text-slate-500">
+                        {buscando ? "Buscando en el catálogo..." : "No se encontraron productos para esa búsqueda."}
+                      </div>
                     ) : null}
                   </div>
                 ) : null}
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                Los productos sin stock se muestran en amarillo. Se pueden vender, pero quedarán con stock negativo.
+                Escanea el código y pulsa Enter para agregarlo. Los productos sin stock se indican en amarillo y no se pueden cobrar hasta regularizar las existencias.
               </p>
             </div>
           </div>
@@ -683,10 +701,22 @@ export function VentasNuevaClient({
                             value={linea.cantidad}
                             onFocus={(event) => event.currentTarget.select()}
                             onClick={(event) => event.currentTarget.select()}
+                            max={linea.stockDisponible}
                             onChange={(event) => cambiarCantidad(linea.articuloId, Number(event.target.value))}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                event.currentTarget.blur();
+                              }
+                            }}
                           />
                         </td>
-                        <td>{money(linea.precioUnitario)}</td>
+                        <td>
+                          {money(linea.precioUnitario)}
+                          {linea.precioUnitario !== linea.precioPublico ? (
+                            <p className="text-xs text-green-700">Mayorista desde {linea.cantidad} unid.</p>
+                          ) : null}
+                        </td>
                         <td>
                           <div className="flex min-w-48 items-center gap-2">
                             <div className="flex rounded-md border border-[#d8dee8] bg-white p-1">
@@ -955,7 +985,7 @@ export function VentasNuevaClient({
               type="submit"
               name="accion"
               value="cobrar"
-              disabled={!lineas.length || saldoPendiente > 0 || !cajaActiva}
+              disabled={!lineas.length || saldoPendiente > 0 || !cajaActiva || enviandoVenta}
               onClick={limpiarCobroRapido}
               className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -965,7 +995,7 @@ export function VentasNuevaClient({
               type="submit"
               name="accion"
               value="pendiente"
-              disabled={!lineas.length}
+              disabled={!lineas.length || enviandoVenta}
               onClick={limpiarCobroRapido}
               className="sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1035,60 +1065,7 @@ export function VentasNuevaClient({
         </div>
       ) : null}
 
-      {dialogoDescuento ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-950">Autorizar descuento</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Para aplicar descuento a {dialogoDescuento.nombreArticulo}, ingresa el PIN autorizado.
-            </p>
-            <label className="sagva-label mt-4">PIN</label>
-            <input
-              ref={pinDescuentoInputRef}
-              className="sagva-field"
-              type="tel"
-              value={pinDescuento}
-              onChange={(event) => {
-                setPinDescuento(event.target.value);
-                setErrorPinDescuento("");
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  confirmarAutorizacionDescuento();
-                }
-                if (event.key === "Escape") {
-                  setDialogoDescuento(null);
-                  setPinDescuento("");
-                  setErrorPinDescuento("");
-                }
-              }}
-            />
-            {errorPinDescuento ? (
-              <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{errorPinDescuento}</p>
-            ) : null}
-            <p className="mt-3 text-xs text-slate-500">
-              Esta autorización es temporal. Luego debe venir desde el módulo de Seguridad.
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setDialogoDescuento(null);
-                  setPinDescuento("");
-                  setErrorPinDescuento("");
-                }}
-                className="sagva-button-secondary"
-              >
-                Cancelar
-              </button>
-              <button type="button" onClick={confirmarAutorizacionDescuento} className="sagva-button-primary">
-                Autorizar
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+
     </>
   );
 }

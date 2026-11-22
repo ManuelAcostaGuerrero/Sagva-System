@@ -104,3 +104,6 @@ textarea {
   border-bottom: 1px solid #e5e9f0;
   padding: 11px 12px;
 }
+
+/* Mostrar solo los campos pertinentes mientras se define la estructura de promociones. */
+form[data-tipo-articulo="PROMOCION"] [data-campos-producto] { display: none; }

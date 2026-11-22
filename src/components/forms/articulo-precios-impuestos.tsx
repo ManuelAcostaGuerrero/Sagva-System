@@ -220,6 +220,12 @@ export function ArticuloPreciosImpuestos({
           >{conservarPrecioPublico ? "Modificar recargo y recalcular precio" : "Conservar precio guardado"}</button>
         </div>
       ) : null}
+      <div className="md:col-span-4 grid gap-2 rounded-md border border-slate-200 p-3 text-sm md:grid-cols-3" aria-live="polite">
+        <span><strong>Ganancia estimada:</strong> {moneda(precioPublico - bruto)}</span>
+        <span><strong>Recargo sobre costo:</strong> {bruto > 0 ? ((precioPublico / bruto - 1) * 100).toFixed(2) : "0"}%</span>
+        <span><strong>Margen sobre venta:</strong> {precioPublico > 0 ? ((precioPublico - bruto) / precioPublico * 100).toFixed(2) : "0"}%</span>
+        <p className="text-xs text-slate-500 md:col-span-3">Estimación comercial sin incluir impuestos adicionales y otros costos. No altera el precio público.</p>
+      </div>
       <input name="ultimoPrecioEditado" type="hidden" value={ultimoEditado} />
       <input name="conservarPrecioPublico" type="hidden" value={conservarPrecioPublico ? "si" : "no"} />
       <input name="actualizarPrecio" type="hidden" value={precioModificado ? "si" : "no"} />
