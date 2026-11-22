@@ -64,11 +64,14 @@ Procesar facturas recibidas, controlar productos facturados, precios acordados, 
 ## Reglas de negocio
 
 1. Al ingresar código o nombre de proveedor, autocompletar datos esenciales.
-2. Si el producto del proveedor ya está asociado, cargar artículo interno.
-3. Si no está asociado, marcar pendiente de asociación.
-4. Si precio facturado difiere del precio acordado, registrar diferencia aparte.
-5. La diferencia no debe distorsionar costo, margen ni precio público.
-6. La diferencia queda asociada a futura nota de crédito.
+2. En la **búsqueda de artículos al cargar una factura**, admitir las tres formas de búsqueda en un mismo campo: **nombre del artículo**, **código de barras** y **código del producto según el proveedor**.
+3. Para el código externo, buscar solo dentro de los códigos asociados al **proveedor seleccionado** en esa factura; un código puede repetirse entre proveedores diferentes.
+4. Si se encuentra una asociación de proveedor + código, cargar el artículo interno correspondiente. Si se encuentra el código de barras, buscar ese artículo. Por nombre, mostrar coincidencias para que el usuario elija.
+5. Si no existe asociación, permitir elegir el artículo correcto y guardar la relación de proveedor + código para futuras facturas. No crear artículos duplicados ni asociarlos automáticamente por coincidencias ambiguas.
+6. Si se encuentran varios resultados, exigir elección del usuario; no ingresar inventario al producto equivocado.
+7. Si precio facturado difiere del precio acordado, registrar diferencia aparte.
+8. La diferencia no debe distorsionar costo, margen ni precio público.
+9. La diferencia queda asociada a futura nota de crédito.
 
 ## Integraciones
 
@@ -83,3 +86,4 @@ Procesar facturas recibidas, controlar productos facturados, precios acordados, 
 - Definir flujo exacto de nota de crédito.
 - Definir si la factura puede quedar en borrador.
 - Definir validaciones fiscales finales.
+- Implementar y probar la búsqueda unificada por nombre, código de barras o código del proveedor en la pantalla real de ingreso de facturas; hoy no se considera implementada.
