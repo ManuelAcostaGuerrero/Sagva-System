@@ -41,6 +41,10 @@ tsconfig.tsbuildinfo
 *.db-journal
 
 # archivos privados de migración (no subir datos comerciales)
-SAGVA_articulos_migracion_privada.json
+SAGVA_articulos_migracion_privada*.json
+SAGVA_revision_previa_migracion*.json
+datos_privados_migracion*.json
+ARTICULO 22-11-2026 04_14_54*.xls*
 datos_migracion/
 reportes-importacion/
+
