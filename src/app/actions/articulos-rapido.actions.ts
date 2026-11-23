@@ -47,31 +47,3 @@ export async function guardarClasificacionRapidaAction(id: string, cambios: Camb
   });
   return { ok: true };
 }
-
-export async function asignarMarcaMasivaAction(ids: string[], marcaId: string | null) {
-  await autorizarEdicionArticulos();
-  if (!Array.isArray(ids) || !ids.length || ids.length > 100 ||
-      ids.some(id => typeof id !== "string" || !id)) throw new Error("Selecciona entre 1 y 100 artículos.");
-  if (marcaId) {
-    const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { id: true } });
-    if (!marca) throw new Error("La marca no existe.");
-  }
-  const resultado = await prisma.articulo.updateMany({
-    where: { id: { in: [...new Set(ids)] } }, data: { marcaId: marcaId || null }
-  });
-  return { ok: true, actualizados: resultado.count };
-}
-
-export async function crearMarcaRapidaAction(entrada: string) {
-  await autorizarEdicionArticulos();
-  if (typeof entrada !== "string" || entrada.length > 100) throw new Error("Nombre de marca inválido.");
-  const nombre = entrada.normalize("NFC").trim().replace(/\s+/g," ");
-  if (!nombre) throw new Error("Escribe el nombre de la marca.");
-  const existentes = await prisma.marca.findMany({ select: { id: true, nombre: true } });
-  const comparable = (value: string) => value.normalize("NFC").trim().toLocaleLowerCase("es");
-  const encontrada = existentes.find(m => comparable(m.nombre) === comparable(nombre));
-  const marca = encontrada ?? await prisma.marca.create({
-    data: { nombre }, select: { id: true, nombre: true }
-  });
-  return { id: marca.id, nombre: marca.nombre };
-}

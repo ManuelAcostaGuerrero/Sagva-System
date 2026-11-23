@@ -4,11 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Edit, Plus, Save, Search } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
-import {
-  guardarClasificacionRapidaAction,
-  asignarMarcaMasivaAction,
-  crearMarcaRapidaAction
-} from "@/app/actions/articulos-rapido.actions";
+import { guardarClasificacionRapidaAction } from "@/app/actions/articulos-rapido.actions";
 
 type Categoria = { id: string; nombre: string };
 type Subfamilia = Categoria & { familiaId: string };
@@ -52,16 +48,12 @@ export function ArticulosListadoClient({
   articulos, familias, subfamilias, marcas, puedeEditar, mostrarGanancia
 }: Props) {
   const [filas, setFilas] = useState(articulos);
-  const [marcasDisponibles, setMarcasDisponibles] = useState(marcas);
   const [busqueda, setBusqueda] = useState("");
   const [busquedaEnFoco, setBusquedaEnFoco] = useState(false);
   const [tipo, setTipo] = useState("");
   const [familia, setFamilia] = useState("");
   const [estado, setEstado] = useState("");
   const [pagina, setPagina] = useState(1);
-  const [seleccionados, setSeleccionados] = useState<string[]>([]);
-  const [marcaMasiva, setMarcaMasiva] = useState("");
-  const [nuevaMarca, setNuevaMarca] = useState("");
   const [editando, setEditando] = useState<string | null>(null);
   const [borrador, setBorrador] = useState<Clasificacion | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -81,23 +73,10 @@ export function ArticulosListadoClient({
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);
   const visibles = filtrados.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
-  const todasVisiblesSeleccionadas = visibles.length > 0 &&
-    visibles.every(a => seleccionados.includes(a.id));
 
   function cambiarFiltro(setter: (value:string)=>void, value:string) {
     setter(value);
     setPagina(1);
-  }
-  function alternar(id: string, checked: boolean) {
-    setSeleccionados(actual => checked ? [...new Set([...actual,id])] : actual.filter(x => x !== id));
-  }
-  function alternarPagina() {
-    setSeleccionados(actual => {
-      const ids = visibles.map(a => a.id);
-      return todasVisiblesSeleccionadas
-        ? actual.filter(id => !ids.includes(id))
-        : [...new Set([...actual, ...ids])];
-    });
   }
   function comenzarEdicion(articulo: ArticuloFila) {
     setEditando(articulo.id);
@@ -120,42 +99,6 @@ export function ArticulosListadoClient({
       setMensaje("Clasificación guardada sin recargar la página.");
     } catch (error) {
       setMensaje(error instanceof Error ? error.message : "No se pudo guardar.");
-    } finally {
-      setGuardando(false);
-    }
-  }
-  async function asignarEnLote() {
-    if (!seleccionados.length || seleccionados.length > 100 || guardando) {
-      setMensaje("Selecciona entre 1 y 100 artículos por operación.");
-      return;
-    }
-    setGuardando(true);
-    setMensaje("");
-    try {
-      const marcaId = marcaMasiva || null;
-      const respuesta = await asignarMarcaMasivaAction(seleccionados,marcaId);
-      setFilas(actual => actual.map(a => seleccionados.includes(a.id) ? {...a,marcaId} : a));
-      setSeleccionados([]);
-      setMensaje("Marca actualizada en "+respuesta.actualizados+" artículos, sin recargar.");
-    } catch (error) {
-      setMensaje(error instanceof Error ? error.message : "Error al asignar marca.");
-    } finally {
-      setGuardando(false);
-    }
-  }
-  async function agregarMarca() {
-    if (!nuevaMarca.trim() || guardando) return;
-    setGuardando(true);
-    setMensaje("");
-    try {
-      const marca = await crearMarcaRapidaAction(nuevaMarca);
-      setMarcasDisponibles(actual => actual.some(a => a.id === marca.id) ? actual :
-        [...actual,marca].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es")));
-      setMarcaMasiva(marca.id);
-      setNuevaMarca("");
-      setMensaje("Marca disponible. Selecciona los artículos para asignarla.");
-    } catch (error) {
-      setMensaje(error instanceof Error ? error.message : "No se pudo crear la marca.");
     } finally {
       setGuardando(false);
     }
@@ -208,34 +151,6 @@ export function ArticulosListadoClient({
         </Link>
       </div>
 
-      {puedeEditar ? (
-        <div className="sagva-panel space-y-3 p-4">
-          <p className="text-sm font-semibold">Asignación de marcas por lote ({seleccionados.length} seleccionados)</p>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="min-w-52 flex-1">
-              <span className="sagva-label">Marca para artículos seleccionados</span>
-              <select className="sagva-field" value={marcaMasiva} onChange={e=>setMarcaMasiva(e.target.value)}>
-                <option value="">Sin marca</option>
-                {marcasDisponibles.map(m=><option key={m.id} value={m.id}>{m.nombre}</option>)}
-              </select>
-            </label>
-            <button type="button" className="sagva-button-primary" disabled={!seleccionados.length || guardando || seleccionados.length > 100} onClick={asignarEnLote}>
-              Asignar a seleccionados
-            </button>
-            <label className="min-w-52 flex-1">
-              <span className="sagva-label">Nueva marca (opcional)</span>
-              <input className="sagva-field" value={nuevaMarca} onChange={e=>setNuevaMarca(e.target.value)}
-                onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();void agregarMarca();}}}
-                placeholder="Marca comercial"/>
-            </label>
-            <button type="button" className="sagva-button-secondary" disabled={guardando || !nuevaMarca.trim()} onClick={agregarMarca}>
-              <Plus className="inline h-4 w-4" /> Crear marca
-            </button>
-          </div>
-          <p className="text-xs text-slate-500">Se asigna la misma marca hasta a 100 artículos por operación. No se infieren marcas automáticamente.</p>
-        </div>
-      ) : null}
-
       {mensaje ? <p role="status" className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">{mensaje}</p> : null}
       <div className="sagva-panel overflow-hidden">
         <div className="sagva-panel-title flex flex-wrap justify-between gap-3">
@@ -246,10 +161,6 @@ export function ArticulosListadoClient({
           <table className="sagva-table">
             <thead>
               <tr>
-                {puedeEditar ? (
-                  <th><input type="checkbox" aria-label="Seleccionar artículos visibles"
-                    checked={todasVisiblesSeleccionadas} onChange={alternarPagina}/></th>
-                ) : null}
                 <th>Código de barras</th><th>Artículo</th><th>Tipo</th><th>Familia</th><th>Marca</th>
                 <th>Precio público</th>
                 {mostrarGanancia ? <th>Ganancia estimada</th> : null}
@@ -259,16 +170,11 @@ export function ArticulosListadoClient({
             <tbody>
               {visibles.map(articulo => (
                 <tr key={articulo.id}>
-                  {puedeEditar ? (
-                    <td><input type="checkbox" checked={seleccionados.includes(articulo.id)}
-                      aria-label={"Seleccionar "+articulo.nombre}
-                      onChange={e=>alternar(articulo.id,e.target.checked)}/></td>
-                  ) : null}
                   <td className="font-semibold">{articulo.codigoBarra || "—"}</td>
                   <td>{articulo.nombre}</td>
                   <td>{articulo.tipoArticulo}</td>
                   <td>{opcionNombre(familias,articulo.familiaId)}</td>
-                  <td>{opcionNombre(marcasDisponibles,articulo.marcaId)}</td>
+                  <td>{opcionNombre(marcas,articulo.marcaId)}</td>
                   <td>{formatCurrency(articulo.precioPublico)}</td>
                   {mostrarGanancia ? (
                     <td className={articulo.precioPublico < articulo.costoConIva ? "text-red-700" : "text-green-700"}>
@@ -294,7 +200,7 @@ export function ArticulosListadoClient({
                   <tr key={articulo.id+"-edicion"} className="bg-blue-50" onKeyDown={event=>{
                     if (event.key === "Enter") { event.preventDefault(); void guardarEdicion(); }
                   }}>
-                    <td colSpan={puedeEditar ? (mostrarGanancia ? 11 : 10) : (mostrarGanancia ? 10 : 9)}>
+                    <td colSpan={mostrarGanancia ? 10 : 9}>
                       <div className="grid items-end gap-3 p-3 md:grid-cols-5">
                         <label><span className="sagva-label">Familia</span>
                           <select className="sagva-field" value={borrador.familiaId ?? ""} onChange={e=>setBorrador(a=>a?{...a,familiaId:e.target.value||null,subfamiliaId:null}:a)}>
@@ -312,7 +218,7 @@ export function ArticulosListadoClient({
                         <label><span className="sagva-label">Marca</span>
                           <select className="sagva-field" value={borrador.marcaId ?? ""} onChange={e=>setBorrador(a=>a?{...a,marcaId:e.target.value||null}:a)}>
                             <option value="">Sin marca</option>
-                            {marcasDisponibles.map(m=><option key={m.id} value={m.id}>{m.nombre}</option>)}
+                            {marcas.map(m=><option key={m.id} value={m.id}>{m.nombre}</option>)}
                           </select>
                         </label>
                         <label><span className="sagva-label">Estado</span>
@@ -330,7 +236,7 @@ export function ArticulosListadoClient({
                     </td>
                   </tr>];
               })}
-              {!visibles.length ? <tr><td colSpan={11} className="py-8 text-center text-slate-500">No hay artículos con estos filtros.</td></tr> : null}
+              {!visibles.length ? <tr><td colSpan={mostrarGanancia ? 10 : 9} className="py-8 text-center text-slate-500">No hay artículos con estos filtros.</td></tr> : null}
             </tbody>
           </table>
         </div>

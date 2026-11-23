@@ -6,7 +6,7 @@
 - Búsqueda por nombre, código interno y código de barras, con filtros de familia, tipo y estado.
 - Listado paginado en cliente (50 por página). La página del servidor todavía carga el catálogo para permitir filtrado local sin recargar.
 - Edición rápida de familia, subfamilia, marca y estado. Enter o Guardar confirman la edición de esa línea sin enviar toda la ficha. Los precios no se recalculan en una edición de clasificación.
-- Gestión manual y masiva de marcas (hasta 100 artículos por lote); no se infieren del nombre.
+- Las marcas se asignan individualmente desde la ficha o la edición rápida del artículo. No existe asignación de marcas por lote ni alta de nuevas marcas desde el listado. El catálogo y la relación `marcaId` se conservan por integridad de los artículos existentes.
 - Ganancia estimada y porcentajes visibles en la ficha; en el listado, ganancia visible solo para administradores, root y contabilidad.
 - Conservación de precio público importado al editar clasificación; selección explícita para recalcular el precio.
 - Tratamiento IVA_RETENIDO conservado en editor y validado en el servidor.
@@ -35,3 +35,9 @@
 8. La emisión tributaria de boletas/tickets para IVA retenido requiere una integración independiente y revisión normativa.
 
 **No se han alterado datos de SQLite desde GitHub. No instalar en producción antes de aprobar estas pruebas.**
+
+## Retiro de bloque de marcas por lote (22-11-2026)
+- Eliminado el panel de «Asignación de marcas por lote», sus casillas de selección, «Marca para artículos seleccionados» y «Nueva marca (opcional)».
+- Retiradas las funciones cliente y acciones de servidor de asignación masiva y creación rápida de marcas desde ese panel.
+- No hay campos de base de datos nuevos asociados a esos controles; solo eran estados locales de React. La tabla `marcas` y la columna `articulos.marca_id` siguen siendo necesarias para la clasificación individual y **no se deben borrar**.
+- Ningún cambio de esquema, limpieza de registros o actualización de SQLite.
