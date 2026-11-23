@@ -319,11 +319,6 @@ export function VentasNuevaClient({
     setErrorVenta("");
     setBannerVuelto(null);
     limpiarCobroRapido();
-    const existenteActual = lineas.find(linea => linea.articuloId === producto.articuloId);
-    if (producto.stockDisponible <= (existenteActual?.cantidad ?? 0)) {
-      setErrorVenta("Stock insuficiente para agregar " + producto.nombreArticulo + ".");
-      return;
-    }
     actualizarVentaActiva((venta) => {
       const existente = venta.lineas.find((linea) => linea.articuloId === producto.articuloId);
 
@@ -364,15 +359,15 @@ export function VentasNuevaClient({
   }
 
   function cambiarCantidad(articuloId: string, cantidad: number) {
+    // La cantidad no depende del stock; la venta sin existencias queda advertida y auditada.
+    const cantidadValida = Math.min(Math.max(Number.isFinite(cantidad) ? cantidad : 1, 1), 99999);
     actualizarVentaActiva((venta) => ({
       ...venta,
       lineas: venta.lineas.map((linea) =>
         linea.articuloId === articuloId ? recalcularLinea({
           ...linea,
-          cantidad: Math.min(Math.max(Number.isFinite(cantidad) ? cantidad : 1, 1), linea.stockDisponible),
-          precioUnitario: precioPorCantidad(linea.precioPublico,
-            Math.min(Math.max(Number.isFinite(cantidad) ? cantidad : 1, 1), linea.stockDisponible),
-            linea.reglasMayoristas)
+          cantidad: cantidadValida,
+          precioUnitario: precioPorCantidad(linea.precioPublico, cantidadValida, linea.reglasMayoristas)
         }) : linea,
       ),
     }));
@@ -631,7 +626,6 @@ export function VentasNuevaClient({
                           key={producto.articuloId}
                           type="button"
                           onClick={() => agregarProducto(producto)}
-                          disabled={sinStock}
                           className={`grid w-full grid-cols-[minmax(0,1fr)_6rem_1.25rem] items-center gap-2 border-b px-3 py-3 text-left last:border-b-0 sm:grid-cols-[minmax(0,1fr)_7rem_1.5rem] sm:gap-4 sm:px-4 ${
                             sinStock ? "border-amber-200 bg-amber-50 hover:bg-amber-100" : "border-[#eef2f7] hover:bg-blue-50"
                           }`}
@@ -674,7 +668,7 @@ export function VentasNuevaClient({
                 ) : null}
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                Escanea el código y pulsa Enter para agregarlo. Los productos sin stock se indican en amarillo y no se pueden cobrar hasta regularizar las existencias.
+                Escanea el código y pulsa Enter para agregarlo. Los productos habilitados aparecen aunque no tengan stock; se indican en amarillo y pueden venderse, dejando el inventario negativo cuando corresponda.
               </p>
             </div>
           </div>
@@ -695,7 +689,7 @@ export function VentasNuevaClient({
                 </thead>
                 <tbody>
                   {lineas.map((linea) => {
-                    const sinStock = linea.stockDisponible <= 0;
+                    const sinStock = linea.stockDisponible < linea.cantidad;
                     const descuentoAutorizado = descuentoEstaAutorizado(linea.articuloId);
                     return (
                       <tr key={linea.articuloId} className={sinStock ? "bg-amber-50" : undefined}>
@@ -704,7 +698,7 @@ export function VentasNuevaClient({
                             <p className="font-bold text-slate-950">{linea.nombreArticulo}</p>
                             {sinStock ? (
                               <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-bold text-amber-900">
-                                Venta sin stock
+                                Stock insuficiente
                               </span>
                             ) : null}
                           </div>
@@ -718,7 +712,7 @@ export function VentasNuevaClient({
                             value={linea.cantidad}
                             onFocus={(event) => event.currentTarget.select()}
                             onClick={(event) => event.currentTarget.select()}
-                            max={linea.stockDisponible}
+                            max={99999}
                             onChange={(event) => cambiarCantidad(linea.articuloId, Number(event.target.value))}
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {

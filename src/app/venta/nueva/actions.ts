@@ -251,31 +251,30 @@ export async function guardarVentaAction(formData: FormData) {
         });
 
         if (accion === "cobrar") {
-          const stock = await tx.inventarioStock.findUnique({
+          // Se permite cobrar sin existencias: el saldo pasa a negativo y se deja trazabilidad.
+          // Upsert es atómico por (articuloId, sucursalId): evita perder salidas simultáneas.
+          const actualizado = await tx.inventarioStock.upsert({
             where: {
               articuloId_sucursalId: {
                 articuloId: linea.articuloId,
-                sucursalId,
-              },
+                sucursalId
+              }
             },
+            create: {
+              articuloId: linea.articuloId,
+              sucursalId,
+              stockActual: -linea.cantidad
+            },
+            update: { stockActual: { decrement: linea.cantidad } },
+            select: { stockActual: true }
           });
-
-          const stockAntes = stock ? Number(stock.stockActual) : 0;
-          if (!stock || stockAntes < linea.cantidad) {
-            throw new Error("SAGVA_STOCK_INSUFICIENTE");
-          }
-          const actualizado = await tx.inventarioStock.updateMany({
-            where: { id: stock.id, stockActual: { gte: linea.cantidad } },
-            data: { stockActual: { decrement: linea.cantidad } }
-          });
-          if (actualizado.count !== 1) throw new Error("SAGVA_STOCK_INSUFICIENTE");
-          const stockDespues = stockAntes - linea.cantidad;
+          const stockDespues = Number(actualizado.stockActual);
 
           await tx.inventarioMovimiento.create({
             data: {
               articuloId: linea.articuloId,
               sucursalId,
-              tipoMovimiento: "salida_venta",
+              tipoMovimiento: stockDespues < 0 ? "salida_venta_sin_stock" : "salida_venta",
               cantidad: linea.cantidad,
               documentoOrigenTipo: "BOLETA",
               documentoOrigenId: venta.id,
@@ -329,9 +328,6 @@ export async function guardarVentaAction(formData: FormData) {
   } catch (error) {
     if (error instanceof Error && error.message === "SAGVA_PRECIO_O_ESTADO_CAMBIO") {
       return { error: "El precio o estado cambió. Vuelve a buscar y agregar el artículo." };
-    }
-    if (error instanceof Error && error.message === "SAGVA_STOCK_INSUFICIENTE") {
-      return { error: "Stock insuficiente. Corrige el inventario o la cantidad antes de cobrar." };
     }
     if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
       const detalle = "meta" in error ? JSON.stringify(error.meta) : "";

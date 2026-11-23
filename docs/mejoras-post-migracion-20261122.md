@@ -17,7 +17,9 @@
 - Búsqueda asincrónica en SQLite por nombre, ID y código de barras; se eliminó la precarga completa de productos. El código exacto se prioriza incluso si coinciden muchos nombres.
 - El lector de código de barras tipo teclado se usa en el buscador; Enter agrega el artículo localizado.
 - Reglas mayoristas aplicadas al cambiar cantidad, tomando el tramo de mayor cantidad mínima aplicable. Se valida el precio otra vez en el servidor.
-- No se cobra con stock insuficiente: se revisa dentro de la transacción y se decrementa condicionalmente para impedir sobreventa concurrente. Regularizar stock antes de vender.
+- La caja muestra únicamente artículos **habilitados** (`estado = activo`). Los habilitados sin existencias siguen apareciendo en amarillo y pueden agregarse y venderse.
+- La cantidad no se limita al stock disponible. La venta puede dejar `inventario_stock.stock_actual` negativo y registra un movimiento `salida_venta_sin_stock` con observación de saldo negativo.
+- Se utiliza `upsert` atómico por artículo y sucursal dentro de la transacción para registrar la disminución de stock, incluso si aún no existe fila en el inventario. El precio vigente y el estado habilitado se validan en el servidor.
 - Descuentos: se retiró el PIN fijo del navegador. Autorización con rol admin/root o permiso explícito para descuentos de ventas; el servidor verifica cada línea.
 - Cantidades, descuentos, subtotales y totales se recalculan en React sin recargar la página. Enter no envía una venta por accidente.
 - Cobro rápido en efectivo: caja registra el total vendido (no el dinero entregado), mientras el vuelto conserva el dinero realmente recibido.
@@ -28,7 +30,7 @@
 1. Actualizar código y respaldo SQLite según el procedimiento SAGVA; no usar seed, reset ni acepta pérdida de datos.
 2. Ejecutar `npm run prisma:generate`, `npm run typecheck`, `node tools/test-venta-mayorista.cjs`, `node tools/test-control-venta.cjs`, `node tools/test-proteccion-precios.cjs` y `npm run build`.
 3. Probar en navegador: búsqueda de código al principio y final del catálogo, lectura con escáner real, venta con tramos mayoristas 1/6/12, edición de cantidad, descuentos con distintos roles, pagos mixtos y vuelto de efectivo.
-4. Probar venta de dos unidades con stock=1 y dos cobros concurrentes sobre mismo stock. La venta debe rechazarse sin generar movimiento parcial.
+4. Probar stock=0, stock=1 con venta de 2 unidades y stock ya negativo. La venta debe efectuarse con movimiento trazable y saldo negativo; probar además dos cobros concurrentes para verificar que no se pierden salidas. Confirmar que un producto deshabilitado no aparece y no se vende.
 5. Confirmar en caja diaria que efectivo registrado sea valor neto vendido; revisar también el cierre de caja.
 6. Verificar que el tipo IVA_RETENIDO siga visible después de editar y guardar un cigarro.
 7. Revisar rendimiento en el navegador con el total de artículos importados y con móvil.
