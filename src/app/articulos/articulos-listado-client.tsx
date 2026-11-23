@@ -147,18 +147,18 @@ export function ArticulosListadoClient({
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap justify-between gap-3">
-        <div className="grid flex-1 gap-2 md:grid-cols-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="grid min-w-0 flex-1 gap-2 md:grid-cols-4">
           <label className="md:col-span-2">
             <span className="sagva-label">Buscar por nombre, ID o código de barras</span>
             <div className="relative">
               <Search
                 aria-hidden="true"
-                className={`pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400 transition-opacity duration-150 ${busquedaEnFoco ? "opacity-0" : "opacity-100"}`}
+                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
               />
               <input
                 ref={busquedaArticuloRef}
-                className={`sagva-field transition-[padding] duration-150 ${busquedaEnFoco ? "pl-3" : "pl-9"}`}
+                className="sagva-field pr-10"
                 value={busqueda} onChange={e=>cambiarFiltro(setBusqueda,e.target.value)}
                 onFocus={()=>setBusquedaEnFoco(true)} onBlur={()=>setBusquedaEnFoco(false)}
                 onKeyDown={e=>{
@@ -197,7 +197,7 @@ export function ArticulosListadoClient({
             </select>
           </label>
         </div>
-        <Link href="/articulos/nuevo" className="inline-flex h-10 items-center gap-2 sagva-button-primary">
+        <Link href="/articulos/nuevo" className="ml-auto inline-flex h-10 shrink-0 items-center gap-2 self-end sagva-button-primary">
           <Plus className="h-4 w-4" /> Nuevo artículo
         </Link>
       </div>

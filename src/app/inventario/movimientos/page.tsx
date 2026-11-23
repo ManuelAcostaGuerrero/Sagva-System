@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function InventarioMovimientosPage() {
   const [articulos, movimientos] = await Promise.all([
-    prisma.articulo.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.articulo.findMany({ select: { id: true, nombre: true, codigoProducto: true, codigoBarra: true, estado: true }, orderBy: { nombre: "asc" } }),
     prisma.inventarioMovimiento.findMany({
       include: { articulo: true, sucursal: true },
       orderBy: { createdAt: "desc" },

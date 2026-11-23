@@ -11,7 +11,9 @@ const react = {
     if (!(i in hooks)) hooks[i] = typeof init === 'function' ? init() : init;
     return [hooks[i], value => hooks[i] = typeof value === 'function' ? value(hooks[i]) : value];
   },
-  useMemo: fn => fn()
+  useMemo: fn => fn(),
+  useEffect: fn => fn(),
+  useRef: () => ({ current: { focus() {} } })
 };
 const jsx = { jsx: (type, props) => ({ type, props: props || {} }), jsxs: (type, props) => ({ type, props: props || {} }), Fragment: 'fragment' };
 const output = {};
@@ -25,6 +27,10 @@ vm.runInNewContext(js, { exports: output, require: name => {
   if (name === 'lucide-react') return { Edit: 'icon', Plus: 'icon', Save: 'icon', Search: 'icon' };
   if (name === '@/utils/formatters/currency') return { formatCurrency: value => String(value) };
   if (name === '@/app/actions/articulos-rapido.actions') return {};
+  if (name === '@/lib/ordenar-articulos') return {
+    ordenarArticulos: rows => rows,
+    siguienteOrdenArticulo: () => null
+  };
   return require(name);
 }, console, Set, Intl });
 

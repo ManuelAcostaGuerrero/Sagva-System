@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export default async function InventarioAjustesPage() {
-  const articulos = await prisma.articulo.findMany({ orderBy: { nombre: "asc" } });
+  const articulos = await prisma.articulo.findMany({ select: { id: true, nombre: true, codigoProducto: true, codigoBarra: true, estado: true }, orderBy: { nombre: "asc" } });
 
   return (
     <AppShell title="Ajustes de Inventario" subtitle="Definir stock físico final con trazabilidad">
