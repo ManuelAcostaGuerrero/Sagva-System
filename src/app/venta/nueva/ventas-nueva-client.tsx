@@ -66,8 +66,11 @@ function money(value: number) {
 }
 
 function crearVentaTemporal(numero: number): VentaTemporal {
+  const identificador = typeof globalThis.crypto?.randomUUID === "function"
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
   return {
-    id: `venta-${Date.now()}-${numero}`,
+    id: `venta-${identificador}`,
     numero,
     cliente: "",
     lineas: [],
@@ -118,7 +121,6 @@ export function VentasNuevaClient({
   const [buscando, setBuscando] = useState(false);
   const [enviandoVenta, setEnviandoVenta] = useState(false);
   const enviandoRef = useRef(false);
-  const [ventasRegistradas, setVentasRegistradas] = useState<string[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const quickMetodoInputRef = useRef<HTMLInputElement>(null);
   const efectivoRecibidoInputRef = useRef<HTMLInputElement>(null);
@@ -132,6 +134,7 @@ export function VentasNuevaClient({
   const [efectivoRecibido, setEfectivoRecibido] = useState("");
   const [dialogoEfectivoAbierto, setDialogoEfectivoAbierto] = useState(false);
   const [bannerVuelto, setBannerVuelto] = useState<{ pago: number; vuelto: number } | null>(null);
+  const [avisoCobro, setAvisoCobro] = useState("");
 
   const ventaActiva = ventas.find((venta) => venta.id === ventaActivaId) ?? ventas[0];
   const lineas = ventaActiva?.lineas ?? [];
@@ -140,7 +143,6 @@ export function VentasNuevaClient({
   const observacion = ventaActiva?.observacion ?? "";
   const metodoPago = ventaActiva?.metodoPago ?? "EFECTIVO";
   const montoPago = ventaActiva?.montoPago ?? "";
-  const ventaYaRegistrada = ventasRegistradas.includes(ventaActiva.id);
 
   // Consultar SQLite mientras se escribe, sin precargar miles de productos ni recargar la página.
   useEffect(() => {
@@ -267,19 +269,49 @@ export function VentasNuevaClient({
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
+  // Cada cobro confirmado finaliza esta transacción. La siguiente empieza con
+  // un identificador NUEVO, incluso para los mismos productos y método de pago.
+  function finalizarVentaConfirmada(id: string) {
+    const restantes = ventas.filter(venta => venta.id !== id);
+    if (restantes.length) {
+      setVentas(restantes);
+      setVentaActivaId(restantes[0].id);
+    } else {
+      const nueva = crearVentaTemporal(1);
+      setVentas([nueva]);
+      setVentaActivaId(nueva.id);
+    }
+    setBusqueda("");
+    setEfectivoRecibido("");
+    setDialogoEfectivoAbierto(false);
+    setBannerVuelto(null);
+    setErrorVenta("");
+    limpiarCobroRapido();
+  }
+
   async function enviarVenta(formData: FormData) {
-    if (enviandoRef.current || ventaYaRegistrada) return;
+    if (enviandoRef.current) return;
     enviandoRef.current = true;
     setEnviandoVenta(true);
     setErrorVenta("");
     try {
       const resultado = await guardarVentaAction(formData);
-      if (resultado?.error) {
-        setErrorVenta(resultado.error);
-        // Ante un error cerrar el modal, nunca dejar el cobro rápido bloqueado.
+      if (resultado && "ok" in resultado && resultado.ok) {
+        const medios = resultado.medios.join(" + ");
+        const cobro = resultado.vuelto > 0
+          ? ` · Vuelto: ${money(resultado.vuelto)}` : "";
+        const mensaje = `Venta ${resultado.folio ?? "sin folio"} cobrada por ${medios} · ${money(resultado.total)}${cobro}. Lista para la siguiente venta.`;
+        finalizarVentaConfirmada(ventaActiva.id);
+        setAvisoCobro(mensaje);
+      } else if (resultado && "error" in resultado && resultado.error) {
         setDialogoEfectivoAbierto(false);
         if ("codigo" in resultado && resultado.codigo === "VENTA_YA_REGISTRADA") {
-          setVentasRegistradas(actual => [...new Set([...actual, ventaActiva.id])]);
+          // El servidor comprobó que esta operación YA está registrada.
+          // Se evita repetir el cargo y se libera la caja para una nueva venta.
+          finalizarVentaConfirmada(ventaActiva.id);
+          setAvisoCobro(`${resultado.error} Se inició una venta nueva; no se repitió el cobro.`);
+        } else {
+          setErrorVenta(resultado.error);
         }
       }
     } catch {
@@ -313,6 +345,8 @@ export function VentasNuevaClient({
     setBusqueda("");
     setEfectivoRecibido("");
     setDialogoEfectivoAbierto(false);
+    setErrorVenta("");
+    setAvisoCobro("");
     limpiarCobroRapido();
   }
 
@@ -429,8 +463,10 @@ export function VentasNuevaClient({
   }
 
   function limpiarVenta() {
+    const nuevoId = crearVentaTemporal(ventaActiva.numero).id;
     actualizarVentaActiva((venta) => ({
       ...venta,
+      id: nuevoId,
       cliente: "",
       lineas: [],
       pagos: [],
@@ -438,10 +474,13 @@ export function VentasNuevaClient({
       metodoPago: "EFECTIVO",
       montoPago: "",
     }));
+    setVentaActivaId(nuevoId);
     setBusqueda("");
     setEfectivoRecibido("");
     setDialogoEfectivoAbierto(false);
     setBannerVuelto(null);
+    setErrorVenta("");
+    setAvisoCobro("");
     limpiarCobroRapido();
   }
 
@@ -485,7 +524,7 @@ export function VentasNuevaClient({
   }
 
   function iniciarCobroRapido(metodo: string) {
-    if (!puedeCobroRapido || enviandoRef.current || ventaYaRegistrada) return;
+    if (!puedeCobroRapido || enviandoRef.current) return;
     setBannerVuelto(null);
 
     if (metodo === "efectivo") {
@@ -500,7 +539,7 @@ export function VentasNuevaClient({
   }
 
   function confirmarEfectivo() {
-    if (enviandoRef.current || ventaYaRegistrada) return;
+    if (enviandoRef.current) return;
     const pago = Number(efectivoRecibido);
     if (!Number.isFinite(pago) || pago < total) return;
     prepararCobroRapido("efectivo", String(pago));
@@ -575,20 +614,20 @@ export function VentasNuevaClient({
           if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();
         }}
         className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
+        {avisoCobro ? (
+          <div role="status" className="rounded-md border border-green-300 bg-green-50 p-3 text-sm font-semibold text-green-900 xl:col-span-2">
+            {avisoCobro}
+          </div>
+        ) : null}
         {errorVenta ? (
           <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800 xl:col-span-2">
             {errorVenta}
-            {ventaYaRegistrada ? (
-              <p className="mt-2 font-semibold">Esta operación ya existe en SAGVA. No se permite volver a cobrar con otro medio de pago.</p>
-            ) : null}
             <div className="mt-3 flex flex-wrap gap-3">
               <Link href="/venta/historial" className="font-semibold text-blue-800 underline">
                 Revisar ventas cobradas
               </Link>
-              {ventaYaRegistrada ? (
-                <button type="button" className="font-semibold text-blue-800 underline"
-                  onClick={crearNuevaInstanciaVenta}>Comenzar otra venta</button>
-              ) : null}
+              <button type="button" className="font-semibold text-blue-800 underline"
+                onClick={crearNuevaInstanciaVenta}>Comenzar otra venta</button>
             </div>
           </div>
         ) : null}
@@ -869,7 +908,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={() => iniciarCobroRapido("efectivo")}
-                disabled={!puedeCobroRapido || enviandoVenta || ventaYaRegistrada}
+                disabled={!puedeCobroRapido || enviandoVenta}
                 className="rounded-md bg-[#064ea4] px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Efectivo F2
@@ -877,7 +916,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={() => iniciarCobroRapido("debito")}
-                disabled={!puedeCobroRapido || enviandoVenta || ventaYaRegistrada}
+                disabled={!puedeCobroRapido || enviandoVenta}
                 className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Débito F6
@@ -885,7 +924,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={() => iniciarCobroRapido("credito")}
-                disabled={!puedeCobroRapido || enviandoVenta || ventaYaRegistrada}
+                disabled={!puedeCobroRapido || enviandoVenta}
                 className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Crédito F8
@@ -893,7 +932,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={() => iniciarCobroRapido("transferencia")}
-                disabled={!puedeCobroRapido || enviandoVenta || ventaYaRegistrada}
+                disabled={!puedeCobroRapido || enviandoVenta}
                 className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Transferencia F10
@@ -1032,7 +1071,7 @@ export function VentasNuevaClient({
               type="submit"
               name="accion"
               value="cobrar"
-              disabled={!lineas.length || saldoPendiente > 0 || enviandoVenta || ventaYaRegistrada}
+              disabled={!lineas.length || saldoPendiente > 0 || enviandoVenta}
               onClick={limpiarCobroRapido}
               className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1042,7 +1081,7 @@ export function VentasNuevaClient({
               type="submit"
               name="accion"
               value="pendiente"
-              disabled={!lineas.length || enviandoVenta || ventaYaRegistrada}
+              disabled={!lineas.length || enviandoVenta}
               onClick={limpiarCobroRapido}
               className="sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1102,7 +1141,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={confirmarEfectivo}
-                disabled={Number(efectivoRecibido || 0) < total || enviandoVenta || ventaYaRegistrada}
+                disabled={Number(efectivoRecibido || 0) < total || enviandoVenta}
                 className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Confirmar

@@ -58,6 +58,7 @@ const scope = {
     if (name === "@/lib/session") return { getCurrentUser: async () => ({ id: "usuario-prueba" }) };
     if (name === "@/lib/venta-permisos") return { puedeAutorizarDescuento: async () => false };
     if (name === "@/lib/venta-precios") return util.exports;
+    if (name === "@/lib/dia-operativo") return { diaOperativo: () => "2026-11-23" };
     if (name === "next/cache") return { revalidatePath() {} };
     if (name === "next/navigation") return { redirect: url => { throw Error("REDIRECT:" + url); } };
     return require(name);
@@ -92,7 +93,8 @@ async function cobrar(cantidad, folio) {
   assert.equal((await cobrar(1, "01")).ok, true);
   assert.equal(stock, -1);
   assert.equal(movimientos.at(-1).tipoMovimiento, "salida_venta_sin_stock");
-  assert.equal(pagosCaja.at(-1).monto, 1000);
+  // Caja sin abrir: la venta es válida y todavía no genera movimientos de caja.
+  assert.equal(pagosCaja.length, 0);
 
   // Desde negativo se siguen anotando salidas, sin perderlas.
   assert.equal((await cobrar(2, "02")).ok, true);

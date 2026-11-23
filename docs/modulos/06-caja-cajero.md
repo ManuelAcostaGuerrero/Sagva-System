@@ -90,3 +90,11 @@ Controlar el flujo de caja por turno y mantener registros definitivos de apertur
 - La UI ignora autorepeticiones de teclas, previene envíos concurrentes con una referencia sincrónica y cierra el modal de efectivo después de un error; no pierde el carrito.
 - Ante un error incierto, revisar historial de ventas antes de reintentar el cobro.
 - Ejecutar `node tools/test-cobro-rapido-duplicados.cjs` y las pruebas anteriores antes de desplegar.
+
+## Ventas consecutivas del mismo producto y medio de pago (23-11-2026)
+- **No existe deduplicación por producto, precio, importe, cliente o medio de pago.** Dos compras idénticas son dos operaciones reales y necesitan dos folios.
+- El ID idempotente pertenece solo al intento de cobro de una venta. Una vez confirmada, SAGVA muestra el folio, libera el carrito y genera otro ID para la siguiente venta, sin refrescar la página.
+- Se permiten operaciones repetidas, incluso F10→F10 o F2→F2 sobre el mismo artículo. La protección contra dobles clics y reenvíos idénticos mantiene el mismo ID solo durante el intento original.
+- Si la operación ya está confirmada en SQLite y llega una petición con el ID anterior, no se cobra otra vez: se notifica y se crea una venta nueva, en vez de bloquear la caja.
+- Al limpiar o cancelar una pestaña se reemplaza también su identificador, no solo sus productos.
+- Ejecutar `node tools/test-cobro-rapido-duplicados.cjs` antes de actualizar un punto de venta.

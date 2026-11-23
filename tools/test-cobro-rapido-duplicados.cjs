@@ -82,11 +82,7 @@ function form(id,metodo){
   return f;
 }
 async function cobrar(id,metodo){
-  try {return await scope.exports.guardarVentaAction(form(id,metodo));}
-  catch(e){
-    if(String(e.message).startsWith("REDIRECT:/venta/nueva?success=cobrada"))return {ok:true};
-    throw e;
-  }
+  return scope.exports.guardarVentaAction(form(id,metodo));
 }
 (async()=>{
   // F10: primer folio choca, transacción se reintenta, solo un cobro queda guardado.
@@ -102,13 +98,29 @@ async function cobrar(id,metodo){
   assert.match(repetida.error,/TRANSFERENCIA/);
   assert.equal(ventas.size,1);
   assert.equal(crearIntentos,2);
-  // Otra venta nueva sí permite cobrar en efectivo.
-  assert.equal((await cobrar("venta-f2-prueba-002","efectivo")).ok,true);
+  // Mismo producto, mismo precio y MISMO medio de pago: ventas legítimas sucesivas.
+  const siguiente=await cobrar("venta-f10-prueba-002","transferencia");
+  assert.equal(siguiente.ok,true);
+  assert.equal(siguiente.folio,"B-00000003");
   assert.equal(ventas.size,2);
-  assert.equal([...ventas.values()][1].pagos[0].metodoPago,"efectivo");
+  assert.equal([...ventas.values()][1].pagos[0].metodoPago,"transferencia");
+
+  // Una tercera transacción con otro ID puede pagar en efectivo sin bloquearse.
+  const efectivo=await cobrar("venta-f2-prueba-003","efectivo");
+  assert.equal(efectivo.ok,true);
+  assert.equal(efectivo.folio,"B-00000004");
+  assert.equal(ventas.size,3);
+  assert.equal([...ventas.values()][2].pagos[0].metodoPago,"efectivo");
+  assert.equal(efectivo.total,500);
+
+  // El formulario debe crear otra operación inmediatamente después de cobrar.
+  const cliente=fs.readFileSync("src/app/venta/nueva/ventas-nueva-client.tsx","utf8");
+  assert.match(cliente,/finalizarVentaConfirmada\(ventaActiva\.id\)/);
+  assert.match(cliente,/setVentaActivaId\(nueva\.id\)/);
+  assert.match(cliente,/randomUUID/);
   // Se mantienen restricciones a descuentos y estados válidos en el servidor.
   const fuente=fs.readFileSync("src/app/venta/nueva/actions.ts","utf8");
   assert.match(fuente,/estado: "activo"/);
   assert.match(fuente,/puedeAutorizarDescuento/);
-  console.log("OK: transferencia F10, colisión de folio, reintento seguro y efectivo F2.");
+  console.log("OK: mismo artículo/medio de pago con folios distintos, F10/F2 e idempotencia de envío.");
 })().catch(e=>{console.error(e);process.exitCode=1;});

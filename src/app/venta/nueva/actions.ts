@@ -190,13 +190,14 @@ export async function guardarVentaAction(formData: FormData) {
   if (lineasValidas.some(linea => linea.descuento > 0) && !autorizadoDescuento) {
     return { error: "Descuento no autorizado. Solicita a un administrador con permisos." };
   }
+  let folioRegistrado: string | null = null;
   try {
     // El número de folio puede colisionar entre cobros simultáneos.
     // Reintentar la transacción completa no duplica productos, pagos ni inventario:
     // Prisma revierte cualquier escritura del intento fallido.
     for (let intento = 0; intento < 3; intento++) {
       try {
-        await prisma.$transaction(async (tx) => {
+        folioRegistrado = await prisma.$transaction(async (tx) => {
       // Asociar la venta únicamente a la caja de este usuario y jornada.
       // Si aún no existe, la venta se cobra dejando cajaId = null.
       const momentoVenta = new Date();
@@ -349,6 +350,7 @@ export async function guardarVentaAction(formData: FormData) {
           },
         });
       }
+      return folioDefinitivo;
         });
         break;
       } catch (error) {
@@ -391,10 +393,16 @@ export async function guardarVentaAction(formData: FormData) {
   revalidatePath("/caja");
 
   if (accion === "cobrar") {
-    if (pagosValidos.length === 1 && pagosValidos[0]?.metodo === "efectivo") {
-      redirect(`/venta/nueva?success=cobrada&pago=${totalPagado}&vuelto=${vuelto}`);
-    }
-    redirect("/venta/nueva?success=cobrada");
+    // El cliente confirma la venta y crea inmediatamente otro identificador.
+    // La UI no debe reutilizar el ID tras vender, aunque repita artículo, precio y pago.
+    return {
+      ok: true as const,
+      folio: folioRegistrado,
+      total,
+      totalPagado,
+      vuelto,
+      medios: pagosValidos.map(pago => pago.metodo.toUpperCase())
+    };
   }
 
   redirect("/venta/abiertas?success=pendiente");

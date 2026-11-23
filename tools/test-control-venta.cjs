@@ -17,7 +17,7 @@ const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind
 const helper = ts.transpileModule(fs.readFileSync('src/lib/venta-precios.ts','utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
 const util = { exports: {} };
 vm.runInNewContext(helper, { ...util, require, Number, Math, console });
-const scope = { exports: {}, require: name => name === '@/lib/prisma' ? { prisma } : name === '@/lib/session' ? { getCurrentUser: async () => ({ id: 'usuario-prueba' }) } : name === '@/lib/venta-permisos' ? { puedeAutorizarDescuento: async () => false } : name === '@/lib/venta-precios' ? util.exports : name === 'next/cache' ? { revalidatePath() {} } : name === 'next/navigation' ? { redirect() {} } : require(name), FormData, Date, Number, Math, JSON, console };
+const scope = { exports: {}, require: name => name === '@/lib/prisma' ? { prisma } : name === '@/lib/session' ? { getCurrentUser: async () => ({ id: 'usuario-prueba' }) } : name === '@/lib/venta-permisos' ? { puedeAutorizarDescuento: async () => false } : name === '@/lib/venta-precios' ? util.exports : name === '@/lib/dia-operativo' ? { diaOperativo: () => '2026-11-23' } : name === 'next/cache' ? { revalidatePath() {} } : name === 'next/navigation' ? { redirect() {} } : require(name), FormData, Date, Number, Math, JSON, console };
 vm.runInNewContext(js, scope);
 const form = (price, discount = 0) => { const value = new FormData(); value.set('sucursalId', 'sucursal-prueba'); value.set('idempotencyKey','venta-prueba-12345'); value.set('accion', 'pendiente'); value.set('lineas', JSON.stringify([{ articuloId: 'articulo-prueba', cantidad: 1, precioUnitario: price, descuento: discount }])); return value; };
 (async () => {
