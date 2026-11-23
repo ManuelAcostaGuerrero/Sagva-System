@@ -47,6 +47,7 @@ const navGroups = [
     label: "Operación",
     items: [
       { label: "Ventas", href: "/venta/nueva", icon: CreditCard },
+      { label: "Historial cobros", href: "/venta/historial", icon: FileText },
       { label: "Caja", href: "/caja", icon: ClipboardList }
     ]
   },

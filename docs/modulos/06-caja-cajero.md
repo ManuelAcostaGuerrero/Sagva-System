@@ -82,3 +82,11 @@ Controlar el flujo de caja por turno y mantener registros definitivos de apertur
 - No se reatribuyen ventas de otro usuario al abrir caja. La caja activa se consulta por usuario y sucursal.
 - La apertura no borra ventas ni altera el stock. No requiere nuevas columnas ni migración de SQLite.
 - En el arqueo, los movimientos de venta por tarjeta, crédito y transferencia se registran para trazabilidad, pero no suman al **efectivo esperado**. Solo las ventas con método EFECTIVO, la apertura y los ingresos/retiros afectan ese cálculo.
+
+## Corrección de cobro rápido F10/F2 (23-11-2026)
+- Un aviso de `P2002` no confirma por sí mismo una venta duplicada. Antes de cobrar se consulta `idTemporal`; si existe, se presenta su estado, folio y método de pago, bloqueando el segundo cobro con esa misma operación.
+- Un choque de `folioDefinitivo` se reintenta hasta tres veces **en transacciones completas**; nunca se repiten movimientos de un intento revertido.
+- F10/Transferencia y F2/Efectivo utilizan un mismo identificador por pestaña de venta. Reintentar con otro medio solo procede si el primero no quedó registrado.
+- La UI ignora autorepeticiones de teclas, previene envíos concurrentes con una referencia sincrónica y cierra el modal de efectivo después de un error; no pierde el carrito.
+- Ante un error incierto, revisar historial de ventas antes de reintentar el cobro.
+- Ejecutar `node tools/test-cobro-rapido-duplicados.cjs` y las pruebas anteriores antes de desplegar.

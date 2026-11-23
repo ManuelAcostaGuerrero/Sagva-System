@@ -47,6 +47,7 @@ const tx = {
   auditoria: { create: async () => ({}) }
 };
 const prisma = {
+  venta: { findUnique: async () => null },
   caja: { findFirst: async () => ({ id: "caja-prueba" }) },
   $transaction: async fn => fn(tx)
 };

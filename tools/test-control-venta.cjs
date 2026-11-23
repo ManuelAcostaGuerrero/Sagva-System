@@ -11,7 +11,7 @@ const tx = {
   venta: { create: async input => { created++; storedSale = input.data; return { id: 'venta-prueba' }; } },
   ventaDetalle: { create: async () => ({}) }
 };
-const prisma = { $transaction: async fn => fn(tx) };
+const prisma = { venta: { findUnique: async () => null }, $transaction: async fn => fn(tx) };
 const source = fs.readFileSync('src/app/venta/nueva/actions.ts', 'utf8');
 const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
 const helper = ts.transpileModule(fs.readFileSync('src/lib/venta-precios.ts','utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;

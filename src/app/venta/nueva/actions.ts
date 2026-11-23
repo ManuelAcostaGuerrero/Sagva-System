@@ -169,12 +169,34 @@ export async function guardarVentaAction(formData: FormData) {
     redirect("/venta/nueva?error=saldo_pendiente");
   }
 
+  const idTemporalVenta = `VT-${user.id}-${idempotencyKey}`;
+  const buscarVentaExistente = () => prisma.venta.findUnique({
+    where: { idTemporal: idTemporalVenta },
+    select: {
+      estado: true, folioDefinitivo: true, total: true,
+      pagos: { select: { metodoPago: true } }
+    }
+  });
+  const existente = await buscarVentaExistente();
+  if (existente) {
+    const medio = existente.pagos.map(pago => pago.metodoPago.toUpperCase()).join(" + ");
+    return {
+      codigo: "VENTA_YA_REGISTRADA" as const,
+      error: `Esta venta ya figura ${existente.estado} (${existente.folioDefinitivo ?? "sin folio"}, ${medio || "sin pago"}). No vuelvas a cobrarla; inicia una nueva venta si corresponde.`
+    };
+  }
+
   const autorizadoDescuento = await puedeAutorizarDescuento(user);
   if (lineasValidas.some(linea => linea.descuento > 0) && !autorizadoDescuento) {
     return { error: "Descuento no autorizado. Solicita a un administrador con permisos." };
   }
   try {
-    await prisma.$transaction(async (tx) => {
+    // El número de folio puede colisionar entre cobros simultáneos.
+    // Reintentar la transacción completa no duplica productos, pagos ni inventario:
+    // Prisma revierte cualquier escritura del intento fallido.
+    for (let intento = 0; intento < 3; intento++) {
+      try {
+        await prisma.$transaction(async (tx) => {
       // Asociar la venta únicamente a la caja de este usuario y jornada.
       // Si aún no existe, la venta se cobra dejando cajaId = null.
       const momentoVenta = new Date();
@@ -227,7 +249,7 @@ export async function guardarVentaAction(formData: FormData) {
 
       const venta = await tx.venta.create({
         data: {
-          idTemporal: `VT-${user.id}-${idempotencyKey}`,
+          idTemporal: idTemporalVenta,
           folioDefinitivo,
           vendedorId: user.id,
           clienteId: null,
@@ -327,16 +349,37 @@ export async function guardarVentaAction(formData: FormData) {
           },
         });
       }
-    });
+        });
+        break;
+      } catch (error) {
+        const meta = error && typeof error === "object" && "meta" in error
+          ? JSON.stringify(error.meta).toLowerCase() : "";
+        const colisionFolio = error && typeof error === "object" &&
+          "code" in error && error.code === "P2002" && meta.includes("folio");
+        if (colisionFolio && intento < 2) continue;
+        throw error;
+      }
+    }
   } catch (error) {
     if (error instanceof Error && error.message === "SAGVA_PRECIO_O_ESTADO_CAMBIO") {
       return { error: "El precio o estado cambió. Vuelve a buscar y agregar el artículo." };
     }
     if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-      const detalle = "meta" in error ? JSON.stringify(error.meta) : "";
-      return { error: detalle.includes("folio")
-        ? "Otro cobro tomó el folio disponible. Revisa el historial y vuelve a intentar."
-        : "Esta venta puede estar ya registrada. Revisa el historial antes de cobrar de nuevo." };
+      // No confundir un folio repetido con una venta que ya fue cobrada.
+      const guardada = await buscarVentaExistente();
+      if (guardada) {
+        const medio = guardada.pagos.map(pago => pago.metodoPago.toUpperCase()).join(" + ");
+        return {
+          codigo: "VENTA_YA_REGISTRADA" as const,
+          error: `Esta venta ya figura ${guardada.estado} (${guardada.folioDefinitivo ?? "sin folio"}, ${medio || "sin pago"}). No vuelvas a cobrarla; inicia una nueva venta si corresponde.`
+        };
+      }
+      const meta = "meta" in error ? JSON.stringify(error.meta).toLowerCase() : "";
+      if (meta.includes("folio")) {
+        return { error: "No fue posible reservar un folio después de varios intentos. No se registró esta venta. Consulta el historial antes de reintentarlo." };
+      }
+      console.error("SAGVA venta: colisión de clave única sin idTemporal existente", meta);
+      return { error: "La venta no pudo registrarse por un conflicto de datos. No cambies el medio de pago hasta comprobar el historial." };
     }
     throw error;
   }

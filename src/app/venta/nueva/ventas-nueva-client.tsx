@@ -117,6 +117,8 @@ export function VentasNuevaClient({
   const [resultadosBusqueda, setResultadosBusqueda] = useState<ProductoVenta[]>(productos);
   const [buscando, setBuscando] = useState(false);
   const [enviandoVenta, setEnviandoVenta] = useState(false);
+  const enviandoRef = useRef(false);
+  const [ventasRegistradas, setVentasRegistradas] = useState<string[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const quickMetodoInputRef = useRef<HTMLInputElement>(null);
   const efectivoRecibidoInputRef = useRef<HTMLInputElement>(null);
@@ -138,6 +140,7 @@ export function VentasNuevaClient({
   const observacion = ventaActiva?.observacion ?? "";
   const metodoPago = ventaActiva?.metodoPago ?? "EFECTIVO";
   const montoPago = ventaActiva?.montoPago ?? "";
+  const ventaYaRegistrada = ventasRegistradas.includes(ventaActiva.id);
 
   // Consultar SQLite mientras se escribe, sin precargar miles de productos ni recargar la página.
   useEffect(() => {
@@ -250,7 +253,7 @@ export function VentasNuevaClient({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.ctrlKey || event.altKey || event.metaKey) return;
+      if (event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
       if (!["F2", "F6", "F8", "F10"].includes(event.key)) return;
       event.preventDefault();
 
@@ -265,15 +268,26 @@ export function VentasNuevaClient({
   });
 
   async function enviarVenta(formData: FormData) {
-    if (enviandoVenta) return;
+    if (enviandoRef.current || ventaYaRegistrada) return;
+    enviandoRef.current = true;
     setEnviandoVenta(true);
     setErrorVenta("");
     try {
       const resultado = await guardarVentaAction(formData);
-      if (resultado?.error) setErrorVenta(resultado.error);
+      if (resultado?.error) {
+        setErrorVenta(resultado.error);
+        // Ante un error cerrar el modal, nunca dejar el cobro rápido bloqueado.
+        setDialogoEfectivoAbierto(false);
+        if ("codigo" in resultado && resultado.codigo === "VENTA_YA_REGISTRADA") {
+          setVentasRegistradas(actual => [...new Set([...actual, ventaActiva.id])]);
+        }
+      }
     } catch {
-      setErrorVenta("No se pudo guardar la venta. Comprueba el historial antes de volver a cobrar.");
+      setDialogoEfectivoAbierto(false);
+      setErrorVenta("No se pudo confirmar el registro. Comprueba el historial antes de volver a cobrar.");
     } finally {
+      limpiarCobroRapido();
+      enviandoRef.current = false;
       setEnviandoVenta(false);
     }
   }
@@ -471,7 +485,7 @@ export function VentasNuevaClient({
   }
 
   function iniciarCobroRapido(metodo: string) {
-    if (!puedeCobroRapido || enviandoVenta) return;
+    if (!puedeCobroRapido || enviandoRef.current || ventaYaRegistrada) return;
     setBannerVuelto(null);
 
     if (metodo === "efectivo") {
@@ -486,6 +500,7 @@ export function VentasNuevaClient({
   }
 
   function confirmarEfectivo() {
+    if (enviandoRef.current || ventaYaRegistrada) return;
     const pago = Number(efectivoRecibido);
     if (!Number.isFinite(pago) || pago < total) return;
     prepararCobroRapido("efectivo", String(pago));
@@ -560,7 +575,23 @@ export function VentasNuevaClient({
           if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();
         }}
         className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
-        {errorVenta ? <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800 xl:col-span-2">{errorVenta}</div> : null}
+        {errorVenta ? (
+          <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800 xl:col-span-2">
+            {errorVenta}
+            {ventaYaRegistrada ? (
+              <p className="mt-2 font-semibold">Esta operación ya existe en SAGVA. No se permite volver a cobrar con otro medio de pago.</p>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Link href="/venta/historial" className="font-semibold text-blue-800 underline">
+                Revisar ventas cobradas
+              </Link>
+              {ventaYaRegistrada ? (
+                <button type="button" className="font-semibold text-blue-800 underline"
+                  onClick={crearNuevaInstanciaVenta}>Comenzar otra venta</button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <input type="hidden" name="sucursalId" value={sucursalId} />
         <input type="hidden" name="idempotencyKey" value={ventaActiva.id} />
         <input type="hidden" name="cajaId" value={cajaActiva?.id ?? ""} />
@@ -838,7 +869,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={() => iniciarCobroRapido("efectivo")}
-                disabled={!puedeCobroRapido}
+                disabled={!puedeCobroRapido || enviandoVenta || ventaYaRegistrada}
                 className="rounded-md bg-[#064ea4] px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Efectivo F2
@@ -846,7 +877,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={() => iniciarCobroRapido("debito")}
-                disabled={!puedeCobroRapido}
+                disabled={!puedeCobroRapido || enviandoVenta || ventaYaRegistrada}
                 className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Débito F6
@@ -854,7 +885,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={() => iniciarCobroRapido("credito")}
-                disabled={!puedeCobroRapido}
+                disabled={!puedeCobroRapido || enviandoVenta || ventaYaRegistrada}
                 className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Crédito F8
@@ -862,7 +893,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={() => iniciarCobroRapido("transferencia")}
-                disabled={!puedeCobroRapido}
+                disabled={!puedeCobroRapido || enviandoVenta || ventaYaRegistrada}
                 className="rounded-md border border-[#d8dee8] bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Transferencia F10
@@ -1001,7 +1032,7 @@ export function VentasNuevaClient({
               type="submit"
               name="accion"
               value="cobrar"
-              disabled={!lineas.length || saldoPendiente > 0 || enviandoVenta}
+              disabled={!lineas.length || saldoPendiente > 0 || enviandoVenta || ventaYaRegistrada}
               onClick={limpiarCobroRapido}
               className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1011,7 +1042,7 @@ export function VentasNuevaClient({
               type="submit"
               name="accion"
               value="pendiente"
-              disabled={!lineas.length || enviandoVenta}
+              disabled={!lineas.length || enviandoVenta || ventaYaRegistrada}
               onClick={limpiarCobroRapido}
               className="sagva-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1071,7 +1102,7 @@ export function VentasNuevaClient({
               <button
                 type="button"
                 onClick={confirmarEfectivo}
-                disabled={Number(efectivoRecibido || 0) < total}
+                disabled={Number(efectivoRecibido || 0) < total || enviandoVenta || ventaYaRegistrada}
                 className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Confirmar
