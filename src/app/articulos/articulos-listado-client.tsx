@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Edit, Plus, Save, Search } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { guardarClasificacionRapidaAction } from "@/app/actions/articulos-rapido.actions";
@@ -49,6 +49,7 @@ export function ArticulosListadoClient({
 }: Props) {
   const [filas, setFilas] = useState(articulos);
   const [busqueda, setBusqueda] = useState("");
+  const busquedaArticuloRef = useRef<HTMLInputElement>(null);
   const [busquedaEnFoco, setBusquedaEnFoco] = useState(false);
   const [tipo, setTipo] = useState("");
   const [familia, setFamilia] = useState("");
@@ -58,6 +59,11 @@ export function ArticulosListadoClient({
   const [borrador, setBorrador] = useState<Clasificacion | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
+
+  // Un escáner de código de barras se comporta como teclado.
+  useEffect(() => {
+    busquedaArticuloRef.current?.focus({ preventScroll: true });
+  }, []);
 
   const filtrados = useMemo(() => {
     const q = normalizar(busqueda);
@@ -97,6 +103,7 @@ export function ArticulosListadoClient({
       setEditando(null);
       setBorrador(null);
       setMensaje("Clasificación guardada sin recargar la página.");
+      busquedaArticuloRef.current?.focus({ preventScroll: true });
     } catch (error) {
       setMensaje(error instanceof Error ? error.message : "No se pudo guardar.");
     } finally {
@@ -116,10 +123,17 @@ export function ArticulosListadoClient({
                 className={`pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400 transition-opacity duration-150 ${busquedaEnFoco ? "opacity-0" : "opacity-100"}`}
               />
               <input
+                ref={busquedaArticuloRef}
                 className={`sagva-field transition-[padding] duration-150 ${busquedaEnFoco ? "pl-3" : "pl-9"}`}
                 value={busqueda} onChange={e=>cambiarFiltro(setBusqueda,e.target.value)}
                 onFocus={()=>setBusquedaEnFoco(true)} onBlur={()=>setBusquedaEnFoco(false)}
-                onKeyDown={e=>{if(e.key==="Enter")e.preventDefault();}}
+                onKeyDown={e=>{
+                  if(e.key==="Enter"){
+                    e.preventDefault();
+                    // El siguiente escaneo sustituye al código anterior.
+                    e.currentTarget.select();
+                  }
+                }}
                 placeholder={busquedaEnFoco ? "" : "Escribe o escanea un código"}
               />
             </div>

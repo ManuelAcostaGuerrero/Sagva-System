@@ -98,3 +98,10 @@ Controlar el flujo de caja por turno y mantener registros definitivos de apertur
 - Si la operación ya está confirmada en SQLite y llega una petición con el ID anterior, no se cobra otra vez: se notifica y se crea una venta nueva, en vez de bloquear la caja.
 - Al limpiar o cancelar una pestaña se reemplaza también su identificador, no solo sus productos.
 - Ejecutar `node tools/test-cobro-rapido-duplicados.cjs` antes de actualizar un punto de venta.
+
+## Escaneo continuo y foco de búsqueda (23-11-2026)
+- En Nueva venta, al abrir la pantalla y al finalizar cada cobro confirmado, el cursor vuelve automáticamente al campo de búsqueda para escanear el siguiente artículo, sin recargar ni desplazar la página.
+- Tras agregar un artículo desde los resultados, se limpia la búsqueda y recupera el foco de inmediato, facilitando el escaneo de varios artículos seguidos en un mismo carrito.
+- Mientras el diálogo de efectivo está abierto, el foco permanece en el importe recibido y no cambia al buscador.
+- En el listado de Artículos, el buscador se enfoca al abrir la pantalla, mantiene el foco al presionar Enter, selecciona el código anterior para reemplazarlo en el próximo escaneo y vuelve al buscador al guardar una clasificación rápida.
+- No modifica la venta, el folio, la base de datos ni el funcionamiento de los lectores HID que envían caracteres y Enter.

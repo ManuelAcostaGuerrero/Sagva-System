@@ -122,6 +122,7 @@ export function VentasNuevaClient({
   const [enviandoVenta, setEnviandoVenta] = useState(false);
   const enviandoRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const busquedaProductoRef = useRef<HTMLInputElement>(null);
   const quickMetodoInputRef = useRef<HTMLInputElement>(null);
   const efectivoRecibidoInputRef = useRef<HTMLInputElement>(null);
   const efectivoInputRef = useRef<HTMLInputElement>(null);
@@ -247,6 +248,14 @@ export function VentasNuevaClient({
 
     setBannerVuelto(null);
   }, []);
+
+  // Caja ágil: enfocar búsqueda al abrir la pantalla, cambiar de venta
+  // y después de cobrar. No roba el foco mientras se confirma efectivo.
+  useEffect(() => {
+    if (!dialogoEfectivoAbierto) {
+      busquedaProductoRef.current?.focus({ preventScroll: true });
+    }
+  }, [ventaActivaId, dialogoEfectivoAbierto]);
 
   useEffect(() => {
     if (!dialogoEfectivoAbierto) return;
@@ -404,6 +413,8 @@ export function VentasNuevaClient({
       };
     });
     setBusqueda("");
+    // Al agregar desde la lista, preparar de inmediato el siguiente escaneo.
+    busquedaProductoRef.current?.focus({ preventScroll: true });
   }
 
   function cambiarCantidad(articuloId: string, cantidad: number) {
@@ -679,6 +690,7 @@ export function VentasNuevaClient({
               <label className="sagva-label">Nombre o código del producto</label>
               <div className="relative">
                 <input
+                  ref={busquedaProductoRef}
                   className="sagva-field"
                   value={busqueda}
                   onChange={(event) => setBusqueda(event.target.value)}
