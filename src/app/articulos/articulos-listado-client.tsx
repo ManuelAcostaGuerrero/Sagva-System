@@ -111,9 +111,12 @@ export function ArticulosListadoClient({
           <label className="md:col-span-2">
             <span className="sagva-label">Buscar por nombre, ID o código de barras</span>
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+              <Search
+                aria-hidden="true"
+                className={`pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400 transition-opacity duration-150 ${busquedaEnFoco ? "opacity-0" : "opacity-100"}`}
+              />
               <input
-                className="sagva-field pl-9"
+                className={`sagva-field transition-[padding] duration-150 ${busquedaEnFoco ? "pl-3" : "pl-9"}`}
                 value={busqueda} onChange={e=>cambiarFiltro(setBusqueda,e.target.value)}
                 onFocus={()=>setBusquedaEnFoco(true)} onBlur={()=>setBusquedaEnFoco(false)}
                 onKeyDown={e=>{if(e.key==="Enter")e.preventDefault();}}

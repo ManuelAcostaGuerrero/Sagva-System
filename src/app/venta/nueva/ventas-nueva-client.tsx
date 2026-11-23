@@ -632,31 +632,31 @@ export function VentasNuevaClient({
                           type="button"
                           onClick={() => agregarProducto(producto)}
                           disabled={sinStock}
-                          className={`flex w-full items-center justify-between gap-4 border-b px-4 py-3 text-left last:border-b-0 ${
+                          className={`grid w-full grid-cols-[minmax(0,1fr)_6rem_1.25rem] items-center gap-2 border-b px-3 py-3 text-left last:border-b-0 sm:grid-cols-[minmax(0,1fr)_7rem_1.5rem] sm:gap-4 sm:px-4 ${
                             sinStock ? "border-amber-200 bg-amber-50 hover:bg-amber-100" : "border-[#eef2f7] hover:bg-blue-50"
                           }`}
                         >
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-bold text-slate-950">{producto.nombreArticulo}</p>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <p className="break-words font-bold text-slate-950">{producto.nombreArticulo}</p>
                               {sinStock ? (
                                 <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-bold text-amber-900">
                                   Sin stock
                                 </span>
                               ) : null}
                             </div>
-                            <p className="text-xs text-slate-500">
+                            <p className="break-words text-xs text-slate-500">
                               Código: {producto.codigoProducto}
                               {producto.codigoBarra ? ` · Barra: ${producto.codigoBarra}` : ""}
                             </p>
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-[#064ea4]">{money(producto.precioPublico)}</p>
-                            <p className={`text-xs font-semibold ${sinStock ? "text-amber-800" : "text-slate-500"}`}>
+                          <div className="min-w-0 text-right tabular-nums">
+                            <p className="whitespace-nowrap font-bold text-[#064ea4]">{money(producto.precioPublico)}</p>
+                            <p className={`whitespace-nowrap text-xs font-semibold ${sinStock ? "text-amber-800" : "text-slate-500"}`}>
                               Stock {producto.stockDisponible}
                             </p>
                           </div>
-                          <Plus className="h-4 w-4 shrink-0 text-[#064ea4]" aria-hidden="true" />
+                          <Plus className="h-4 w-4 justify-self-end text-[#064ea4]" aria-hidden="true" />
                         </button>
                       );
                     })}
