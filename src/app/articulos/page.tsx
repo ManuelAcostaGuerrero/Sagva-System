@@ -1,98 +1,48 @@
-import Link from "next/link";
-import { Edit, Plus } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { prisma } from "@/lib/prisma";
-import { formatCurrency } from "@/utils/formatters/currency";
+import { getCurrentUser } from "@/lib/session";
+import { ArticulosListadoClient } from "./articulos-listado-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function ArticulosPage() {
-  const articulos = await prisma.articulo.findMany({
-    include: {
-      familia: true,
-      marca: true,
-      precios: {
-        where: { vigente: true },
-        take: 1,
-        orderBy: { createdAt: "desc" }
+  const [articulos, familias, subfamilias, marcas, user] = await Promise.all([
+    prisma.articulo.findMany({
+      select: {
+        id: true, codigoProducto: true, codigoBarra: true, nombre: true,
+        tipoArticulo: true, familiaId: true, subfamiliaId: true, marcaId: true, estado: true,
+        precios: { where: { vigente: true }, orderBy: { createdAt: "desc" }, take: 1,
+          select: { precioPublico: true, precioConIva: true } },
+        stocks: { select: { stockActual: true } }
       },
-      stocks: true
-    },
-    orderBy: { nombre: "asc" }
-  });
-
+      orderBy: { nombre: "asc" }
+    }),
+    prisma.familia.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.subfamilia.findMany({ select: { id: true, familiaId: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    prisma.marca.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
+    getCurrentUser()
+  ]);
+  const codigo = user?.rol?.codigo;
+  const puedeEditar = codigo === "admin" || codigo === "root" ||
+    !!(user?.rolId && await prisma.permiso.findFirst({
+      where: { rolId: user.rolId, modulo: "articulos", accion: "editar", permitido: true,
+        campo: null }, select: { id: true }
+    }));
+  const mostrarGanancia = codigo === "admin" || codigo === "root" || codigo === "contabilidad";
   return (
-    <AppShell title="Artículos" subtitle="Listado, precios, stock y edición de productos">
-      <section className="space-y-5">
-        <div className="flex justify-end">
-          <Link href="/articulos/nuevo" className="inline-flex items-center gap-2 sagva-button-primary">
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Nuevo artículo
-          </Link>
-        </div>
-
-        <div className="sagva-panel overflow-hidden">
-          <div className="sagva-panel-title">Listado de artículos</div>
-          <div className="overflow-x-auto">
-            <table className="sagva-table">
-              <thead>
-                <tr>
-                  <th>Código</th>
-                  <th>Artículo</th>
-                  <th>Tipo</th>
-                  <th>Familia</th>
-                  <th>Marca</th>
-                  <th>Precio público</th>
-                  <th>Stock</th>
-                  <th>Estado</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {articulos.map((articulo) => {
-                  const precio = articulo.precios[0];
-                  const stock = articulo.stocks.reduce(
-                    (sum, item) => sum + Number(item.stockActual),
-                    0
-                  );
-                  return (
-                    <tr key={articulo.id}>
-                      <td className="font-semibold text-slate-900">{articulo.codigoProducto}</td>
-                      <td>{articulo.nombre}</td>
-                      <td>{articulo.tipoArticulo === "PROMOCION" ? "Promoción" : articulo.tipoArticulo === "ARTICULO" ? "Artículo" : "Producto"}</td>
-                      <td>{articulo.familia?.nombre ?? "-"}</td>
-                      <td>{articulo.marca?.nombre ?? "-"}</td>
-                      <td>{formatCurrency(Number(precio?.precioPublico ?? 0))}</td>
-                      <td>{stock}</td>
-                      <td>
-                        <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700">
-                          {articulo.estado}
-                        </span>
-                      </td>
-                      <td>
-                        <Link
-                          href={`/articulos/${articulo.id}/editar`}
-                          className="inline-flex items-center gap-1 text-sm font-bold text-[#064ea4]"
-                        >
-                          <Edit className="h-4 w-4" aria-hidden="true" />
-                          Editar
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {articulos.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-500">
-                      No hay artículos registrados todavía.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+    <AppShell title="Artículos" subtitle="Catálogo, clasificación y precios">
+      <ArticulosListadoClient
+        articulos={articulos.map(a => ({
+          id:a.id, codigoProducto:a.codigoProducto, codigoBarra:a.codigoBarra, nombre:a.nombre,
+          tipoArticulo:a.tipoArticulo, familiaId:a.familiaId, subfamiliaId:a.subfamiliaId,
+          marcaId:a.marcaId, estado:a.estado,
+          precioPublico:Number(a.precios[0]?.precioPublico ?? 0),
+          costoConIva:Number(a.precios[0]?.precioConIva ?? 0),
+          stock:a.stocks.reduce((sum,s)=>sum+Number(s.stockActual),0)
+        }))}
+        familias={familias} subfamilias={subfamilias} marcas={marcas}
+        puedeEditar={Boolean(puedeEditar)} mostrarGanancia={mostrarGanancia}
+      />
     </AppShell>
   );
 }

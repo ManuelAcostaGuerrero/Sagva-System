@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import type { Prisma } from "@prisma/client";
+import { puedeAutorizarDescuento } from "@/lib/venta-permisos";
+import { precioPorCantidad, type TramoMayorista } from "@/lib/venta-precios";
 
 type LineaVentaInput = {
   articuloId: string;
@@ -37,8 +40,8 @@ function toMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-async function obtenerSiguienteFolio(sucursalId: string) {
-  const ventas = await prisma.venta.findMany({
+async function obtenerSiguienteFolio(sucursalId: string, tx: Prisma.TransactionClient) {
+  const ventas = await tx.venta.findMany({
     where: {
       sucursalId,
       folioDefinitivo: {
@@ -74,6 +77,20 @@ export async function guardarVentaAction(formData: FormData) {
   const efectivoRecibido = Number(stringValue(formData, "efectivoRecibido") || 0);
   const lineas = jsonValue<LineaVentaInput[]>(formData, "lineas", []);
   const pagos = jsonValue<PagoVentaInput[]>(formData, "pagos", []);
+  const idempotencyKey = stringValue(formData, "idempotencyKey");
+
+  if (!/^[a-zA-Z0-9_-]{12,100}$/.test(idempotencyKey)) {
+    return { error: "Identificador de venta inválido. Recarga la caja y vuelve a intentar." };
+  }
+  if (!Array.isArray(lineas) || !Array.isArray(pagos) || lineas.length > 100 || pagos.length > 20) {
+    return { error: "La venta supera los límites de líneas o pagos." };
+  }
+  if (quickMetodo && !["efectivo", "debito", "credito", "transferencia"].includes(quickMetodo)) {
+    return { error: "Medio de pago no admitido." };
+  }
+  if (!["cobrar", "pendiente"].includes(accion)) {
+    return { error: "Acción de venta inválida." };
+  }
 
   if (!sucursalId) {
     redirect("/venta/nueva?error=sucursal");
@@ -93,7 +110,7 @@ export async function guardarVentaAction(formData: FormData) {
     const descuento = Number(linea.descuento ?? 0);
 
     const subtotalBruto = cantidad * precioUnitario;
-    if (!linea.articuloId || !Number.isFinite(cantidad) || cantidad <= 0 ||
+    if (!linea.articuloId || !Number.isFinite(cantidad) || cantidad <= 0 || cantidad > 99999 ||
         !Number.isFinite(precioUnitario) || precioUnitario < 0 || !Number.isFinite(subtotalBruto) ||
         !Number.isFinite(descuento) || descuento < 0 || descuento > toMoney(subtotalBruto)) {
       throw new Error("La venta contiene una línea inválida.");
@@ -118,6 +135,10 @@ export async function guardarVentaAction(formData: FormData) {
       monto: Number(pago.monto),
     }))
     .filter((pago) => Number.isFinite(pago.monto) && pago.monto > 0);
+  if (pagos.some(p => !p || !Number.isFinite(Number(p.monto)) || Number(p.monto) <= 0 ||
+      !["efectivo","debito","credito","transferencia"].includes(String(p.metodo).toLowerCase()))) {
+    return { error: "Hay un pago inválido o un medio de pago desconocido." };
+  }
 
   if (accion === "cobrar" && quickMetodo) {
     if (quickMetodo === "efectivo") {
@@ -128,7 +149,7 @@ export async function guardarVentaAction(formData: FormData) {
       pagosValidos = [
         {
           metodo: "efectivo",
-          monto: toMoney(efectivoRecibido),
+          monto: total, // En caja se registra el valor vendido, no todo el efectivo recibido.
         },
       ];
     } else {
@@ -143,37 +164,67 @@ export async function guardarVentaAction(formData: FormData) {
 
   const totalPagado = toMoney(pagosValidos.reduce((sum, pago) => sum + pago.monto, 0));
   const saldoPendiente = toMoney(Math.max(total - totalPagado, 0));
-  const vuelto = toMoney(Math.max(totalPagado - total, 0));
+  const vuelto = quickMetodo === "efectivo"
+    ? toMoney(Math.max(efectivoRecibido - total, 0))
+    : toMoney(Math.max(totalPagado - total, 0));
+  if (totalPagado > total) return { error: "Los pagos registrados superan el total de la venta." };
 
   if (accion === "cobrar" && saldoPendiente > 0) {
     redirect("/venta/nueva?error=saldo_pendiente");
   }
 
+  const autorizadoDescuento = await puedeAutorizarDescuento(user);
+  if (lineasValidas.some(linea => linea.descuento > 0) && !autorizadoDescuento) {
+    return { error: "Descuento no autorizado. Solicita a un administrador con permisos." };
+  }
+  if (accion === "cobrar") {
+    const caja = await prisma.caja.findFirst({
+      where: { id: cajaId, sucursalId, estado: "abierta" }, select: { id: true }
+    });
+    if (!caja) return { error: "La caja está cerrada o no corresponde a la sucursal." };
+  }
   try {
     await prisma.$transaction(async (tx) => {
       // Verificar en la misma transacción que ningún precio/estado cambió desde que se armó la venta.
       const ids = [...new Set(lineasValidas.map((linea) => linea.articuloId))];
-      const [articulos, precios] = await Promise.all([
-        tx.articulo.findMany({ where: { id: { in: ids }, estado: "activo" }, select: { id: true } }),
+      const [articulos, precios, reglas] = await Promise.all([
+        tx.articulo.findMany({ where: { id: { in: ids }, estado: "activo", tipoArticulo: { not: "PROMOCION" } }, select: { id: true } }),
         tx.articuloPrecio.findMany({ where: { articuloId: { in: ids }, vigente: true },
-          orderBy: { createdAt: "desc" }, select: { articuloId: true, precioPublico: true } }),
+          orderBy: { createdAt: "desc" }, select: { articuloId: true, precioPublico: true, precioMayorista: true, cantidadMinimaMayorista: true } }),
+        tx.articuloReglaMayorista.findMany({ where: { articuloId: { in: ids } },
+          select: { articuloId: true, cantidadMinima: true, precioUnitario: true } }),
       ]);
       const activos = new Set(articulos.map((articulo) => articulo.id));
-      const preciosVigentes = new Map<string, number>();
+      const preciosVigentes = new Map<string, { publico: number; legacy: TramoMayorista | null }>();
+      const tramosPorArticulo = new Map<string, TramoMayorista[]>();
+      for (const regla of reglas) {
+        const tramos = tramosPorArticulo.get(regla.articuloId) ?? [];
+        tramos.push({ cantidadMinima: Number(regla.cantidadMinima), precioUnitario: Number(regla.precioUnitario) });
+        tramosPorArticulo.set(regla.articuloId, tramos);
+      }
       for (const precio of precios) {
-        if (!preciosVigentes.has(precio.articuloId)) preciosVigentes.set(precio.articuloId, Number(precio.precioPublico));
+        if (!preciosVigentes.has(precio.articuloId)) preciosVigentes.set(precio.articuloId, {
+          publico: Number(precio.precioPublico),
+          legacy: precio.precioMayorista && precio.cantidadMinimaMayorista
+            ? { cantidadMinima: Number(precio.cantidadMinimaMayorista), precioUnitario: Number(precio.precioMayorista) }
+            : null
+        });
       }
       for (const linea of lineasValidas) {
-        if (!activos.has(linea.articuloId) || !preciosVigentes.has(linea.articuloId) ||
-            preciosVigentes.get(linea.articuloId) !== linea.precioUnitario) {
+        const vigente = preciosVigentes.get(linea.articuloId);
+        const tramos = tramosPorArticulo.get(linea.articuloId) ?? [];
+        const aplicables = tramos.length ? tramos : vigente?.legacy ? [vigente.legacy] : [];
+        const esperado = vigente ? precioPorCantidad(vigente.publico, linea.cantidad, aplicables) : null;
+        if (!activos.has(linea.articuloId) || esperado === null ||
+            Math.abs(esperado - linea.precioUnitario) > 0.005) {
           throw new Error("SAGVA_PRECIO_O_ESTADO_CAMBIO");
         }
       }
-      const folioDefinitivo = accion === "cobrar" ? await obtenerSiguienteFolio(sucursalId) : null;
+      const folioDefinitivo = accion === "cobrar" ? await obtenerSiguienteFolio(sucursalId, tx) : null;
 
       const venta = await tx.venta.create({
         data: {
-          idTemporal: `VT-${user.id}-${Date.now()}`,
+          idTemporal: `VT-${user.id}-${idempotencyKey}`,
           folioDefinitivo,
           vendedorId: user.id,
           clienteId: null,
@@ -210,30 +261,21 @@ export async function guardarVentaAction(formData: FormData) {
           });
 
           const stockAntes = stock ? Number(stock.stockActual) : 0;
-          const stockDespues = stockAntes - linea.cantidad;
-
-          if (stock) {
-            await tx.inventarioStock.update({
-              where: { id: stock.id },
-              data: {
-                stockActual: stockDespues,
-              },
-            });
-          } else {
-            await tx.inventarioStock.create({
-              data: {
-                articuloId: linea.articuloId,
-                sucursalId,
-                stockActual: stockDespues,
-              },
-            });
+          if (!stock || stockAntes < linea.cantidad) {
+            throw new Error("SAGVA_STOCK_INSUFICIENTE");
           }
+          const actualizado = await tx.inventarioStock.updateMany({
+            where: { id: stock.id, stockActual: { gte: linea.cantidad } },
+            data: { stockActual: { decrement: linea.cantidad } }
+          });
+          if (actualizado.count !== 1) throw new Error("SAGVA_STOCK_INSUFICIENTE");
+          const stockDespues = stockAntes - linea.cantidad;
 
           await tx.inventarioMovimiento.create({
             data: {
               articuloId: linea.articuloId,
               sucursalId,
-              tipoMovimiento: stockAntes <= 0 ? "salida_venta_sin_stock" : "salida_venta",
+              tipoMovimiento: "salida_venta",
               cantidad: linea.cantidad,
               documentoOrigenTipo: "BOLETA",
               documentoOrigenId: venta.id,
@@ -269,7 +311,7 @@ export async function guardarVentaAction(formData: FormData) {
         }
       }
 
-      if (observacion || clienteNombre) {
+      if (observacion || clienteNombre || lineasValidas.some(l => l.descuento > 0)) {
         await tx.auditoria.create({
           data: {
             usuarioId: user.id,
@@ -277,7 +319,8 @@ export async function guardarVentaAction(formData: FormData) {
             modulo: "ventas",
             entidad: "Venta",
             entidadId: venta.id,
-            datoNuevo: JSON.stringify({ clienteNombre, observacion }),
+            datoNuevo: JSON.stringify({ clienteNombre, observacion,
+              descuentos: lineasValidas.filter(l => l.descuento > 0).map(l => ({ articuloId: l.articuloId, cantidad: l.cantidad, descuento: l.descuento })) }),
             motivo: observacion || clienteNombre || null,
           },
         });
@@ -285,7 +328,16 @@ export async function guardarVentaAction(formData: FormData) {
     });
   } catch (error) {
     if (error instanceof Error && error.message === "SAGVA_PRECIO_O_ESTADO_CAMBIO") {
-      return { error: "El precio o estado de un artículo cambió. Quítalo y vuelve a agregarlo para usar los datos actuales." };
+      return { error: "El precio o estado cambió. Vuelve a buscar y agregar el artículo." };
+    }
+    if (error instanceof Error && error.message === "SAGVA_STOCK_INSUFICIENTE") {
+      return { error: "Stock insuficiente. Corrige el inventario o la cantidad antes de cobrar." };
+    }
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+      const detalle = "meta" in error ? JSON.stringify(error.meta) : "";
+      return { error: detalle.includes("folio")
+        ? "Otro cobro tomó el folio disponible. Revisa el historial y vuelve a intentar."
+        : "Esta venta puede estar ya registrada. Revisa el historial antes de cobrar de nuevo." };
     }
     throw error;
   }

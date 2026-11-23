@@ -1,17 +1,10 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { prisma } from "@/lib/prisma";
 import { VentasNuevaClient } from "./ventas-nueva-client";
+import { getCurrentUser } from "@/lib/session";
+import { puedeAutorizarDescuento } from "@/lib/venta-permisos";
 
 export const dynamic = "force-dynamic";
-
-function toNumber(value: unknown): number {
-  if (typeof value === "number") return value;
-  if (typeof value === "string") return Number(value);
-  if (value && typeof value === "object" && "toString" in value) {
-    return Number(value.toString());
-  }
-  return 0;
-}
 
 type NuevaVentaPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -29,6 +22,8 @@ export default async function NuevaVentaPage({ searchParams }: NuevaVentaPagePro
     .filter(Boolean)
     .join("-") || "nueva-venta";
 
+  const usuario = await getCurrentUser();
+  const puedeDescontar = await puedeAutorizarDescuento(usuario);
   const sucursal = await prisma.sucursal.findFirst({
     orderBy: { createdAt: "asc" },
   });
@@ -43,41 +38,6 @@ export default async function NuevaVentaPage({ searchParams }: NuevaVentaPagePro
       })
     : null;
 
-  const productos = sucursal
-    ? await prisma.articulo.findMany({
-        where: {
-          estado: "activo",
-        },
-        include: {
-          precios: {
-            where: { vigente: true },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-          stocks: {
-            where: { sucursalId: sucursal.id },
-            take: 1,
-          },
-        },
-        orderBy: { nombre: "asc" },
-      })
-    : [];
-
-  const productosVenta = productos.map((articulo) => {
-    const precio = articulo.precios[0];
-    const stock = articulo.stocks[0];
-
-    return {
-      articuloId: articulo.id,
-      codigoProducto: articulo.codigoProducto,
-      codigoBarra: articulo.codigoBarra,
-      nombreArticulo: articulo.nombre,
-      precioPublico: toNumber(precio?.precioPublico),
-      stockDisponible: toNumber(stock?.stockActual),
-      controlaStock: true,
-    };
-  });
-
   return (
     <AppShell title="Nueva venta">
       {!sucursal ? (
@@ -87,7 +47,8 @@ export default async function NuevaVentaPage({ searchParams }: NuevaVentaPagePro
       ) : (
         <VentasNuevaClient
           key={resetKey}
-          productos={productosVenta}
+          productos={[]}
+          puedeAutorizarDescuento={puedeDescontar}
           sucursalId={sucursal.id}
           sucursalNombre={sucursal.nombre}
           cajaActiva={

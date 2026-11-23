@@ -30,6 +30,10 @@ function tipoArticuloFromForm(formData: FormData) {
 }
 
 function articuloDataFromForm(formData: FormData) {
+  const tipoImpuesto = stringValue(formData, "tipoImpuesto") || "IVA";
+  if (!["IVA", "exento", "IVA_RETENIDO", "impuesto_adicional"].includes(tipoImpuesto)) {
+    throw new Error("Tratamiento tributario inválido.");
+  }
   return {
     codigoBarra: optionalStringValue(formData, "codigoBarra"),
     nombre: stringValue(formData, "nombre"),
@@ -39,7 +43,7 @@ function articuloDataFromForm(formData: FormData) {
     marcaId: optionalStringValue(formData, "marcaId"),
     unidadMedida: stringValue(formData, "unidadMedida") || "UND",
     cantidadEspecifica: optionalStringValue(formData, "cantidadEspecifica"),
-    tipoImpuesto: stringValue(formData, "tipoImpuesto") || "IVA",
+    tipoImpuesto,
     impuestoAdicional: numeroDecimalValidado(formData, "impuestoAdicional"),
     stockMinimo: numeroDecimalValidado(formData, "stockMinimo", 3),
     stockMaximo: numeroDecimalValidado(formData, "stockMaximo", 3),
@@ -151,6 +155,9 @@ function precioDataFromForm(formData: FormData, conservarPrecioPublico = false) 
 
 export async function crearArticuloAction(formData: FormData) {
   const articuloData = articuloDataFromForm(formData);
+  if (articuloData.tipoArticulo === "PROMOCION") {
+    throw new Error("Configura las promociones desde ensamblaje cuando esté disponible.");
+  }
   const precioData = precioDataFromForm(formData);
   const stockInicial = numeroDecimalValidado(formData, "stockInicial", 3);
   const vinculacion = vinculacionProveedorFromForm(formData);
@@ -212,6 +219,9 @@ export async function crearArticuloAction(formData: FormData) {
 
 export async function actualizarArticuloAction(id: string, formData: FormData) {
   const articuloData = articuloDataFromForm(formData);
+  if (articuloData.tipoArticulo === "PROMOCION") {
+    throw new Error("No se puede tratar una promoción como producto individual.");
+  }
   const conservarPrecioPublico = stringValue(formData, "conservarPrecioPublico") === "si";
   const actualizarPrecio = stringValue(formData, "actualizarPrecio") !== "no";
   const precioData = actualizarPrecio ? precioDataFromForm(formData, conservarPrecioPublico) : null;

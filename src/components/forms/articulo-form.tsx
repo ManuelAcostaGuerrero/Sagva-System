@@ -4,6 +4,7 @@ import { ArticuloPreciosImpuestos } from "@/components/forms/articulo-precios-im
 import { CampoNumerico } from "@/components/forms/campo-numerico";
 import { ArticuloClasificacion } from "@/components/forms/articulo-clasificacion";
 import { ArticuloReglasMayoristas } from "@/components/forms/articulo-reglas-mayoristas";
+import { FormularioArticuloInteractivo } from "@/components/forms/formulario-articulo-interactivo";
 import { crearArticuloAction, actualizarArticuloAction } from "@/app/actions/articulos.actions";
 
 type ArticuloWithPrecio = Articulo & {
@@ -27,7 +28,7 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
     : crearArticuloAction;
 
   return (
-    <form action={action} className="space-y-5">
+    <FormularioArticuloInteractivo action={action} tipoInicial={articulo?.tipoArticulo ?? "PRODUCTO"}>
       <section className="sagva-panel">
         <div className="sagva-panel-title grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
           <span>Información del artículo</span>
@@ -160,7 +161,7 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
         />
       </section>
 
-      <section className="sagva-panel">
+      <section className="sagva-panel" data-campos-producto>
         <div className="sagva-panel-title">Inventario</div>
         <div className="grid gap-4 p-4 md:grid-cols-4">
           <label>
@@ -174,7 +175,7 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
         </div>
       </section>
 
-      <section className="sagva-panel">
+      <section className="sagva-panel" data-campos-producto>
         <div className="sagva-panel-title">Reglas de precios mayoristas</div>
         <ArticuloReglasMayoristas
           iniciales={
@@ -217,6 +218,6 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
           Guardar artículo
         </button>
       </div>
-    </form>
+    </FormularioArticuloInteractivo>
   );
 }
