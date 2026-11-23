@@ -20,6 +20,7 @@ let movimientos = [];
 let ventas = [];
 let pagosCaja = [];
 const tx = {
+  caja: { findFirst: async () => null },
   articulo: { findMany: async ({ where }) =>
     habilitado && where.estado === "activo" ? [{ id: "articulo-prueba" }] : [] },
   articuloPrecio: { findMany: async () =>

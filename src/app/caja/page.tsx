@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/session";
 import { formatCurrency } from "@/utils/formatters/currency";
 import {
   abrirCajaAction,
@@ -19,6 +20,7 @@ function toNumber(value: unknown): number {
 }
 
 export default async function CajaPage() {
+  const usuario = await getCurrentUser();
   const sucursal = await prisma.sucursal.findFirst({
     orderBy: { createdAt: "asc" },
   });
@@ -27,6 +29,7 @@ export default async function CajaPage() {
     ? await prisma.caja.findFirst({
         where: {
           sucursalId: sucursal.id,
+          usuarioId: usuario?.id ?? "__sin_sesion__",
           estado: "abierta",
         },
         include: {
@@ -44,6 +47,7 @@ export default async function CajaPage() {
     : null;
 
   const historial = await prisma.caja.findMany({
+    where: { usuarioId: usuario?.id ?? "__sin_sesion__" },
     include: {
       usuario: true,
       sucursal: true,
@@ -121,7 +125,7 @@ export default async function CajaPage() {
               ) : (
                 <form action={abrirCajaAction} className="grid gap-4 p-5 md:grid-cols-2">
                   <div>
-                    <label className="sagva-label">Monto inicial</label>
+                    <label className="sagva-label">Monto inicial (fondo de caja)</label>
                     <input
                       className="sagva-field"
                       name="montoInicial"
@@ -135,6 +139,7 @@ export default async function CajaPage() {
                     <label className="sagva-label">Sucursal</label>
                     <input className="sagva-field" value={sucursal?.nombre ?? "-"} readOnly />
                   </div>
+                  <p className="text-xs text-amber-900 md:col-span-2">Si ya hiciste ventas antes de abrir, no incluyas ese efectivo en el monto inicial: SAGVA registrará esos pagos automáticamente al asociar las ventas de tu jornada.</p>
                   <div className="md:col-span-2">
                     <label className="sagva-label">Observación</label>
                     <textarea

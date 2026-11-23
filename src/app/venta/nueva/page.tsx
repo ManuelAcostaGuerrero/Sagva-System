@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { VentasNuevaClient } from "./ventas-nueva-client";
 import { getCurrentUser } from "@/lib/session";
 import { puedeAutorizarDescuento } from "@/lib/venta-permisos";
+import { diaOperativo } from "@/lib/dia-operativo";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +33,14 @@ export default async function NuevaVentaPage({ searchParams }: NuevaVentaPagePro
     ? await prisma.caja.findFirst({
         where: {
           sucursalId: sucursal.id,
+          usuarioId: usuario?.id ?? "__sin_sesion__",
           estado: "abierta",
         },
         orderBy: { fechaApertura: "desc" },
       })
     : null;
+  const cajaJornada = cajaActiva && diaOperativo(cajaActiva.fechaApertura) === diaOperativo(new Date())
+    ? cajaActiva : null;
 
   return (
     <AppShell title="Nueva venta">
@@ -52,11 +56,11 @@ export default async function NuevaVentaPage({ searchParams }: NuevaVentaPagePro
           sucursalId={sucursal.id}
           sucursalNombre={sucursal.nombre}
           cajaActiva={
-            cajaActiva
+            cajaJornada
               ? {
-                  id: cajaActiva.id,
-                  nombre: `Caja ${cajaActiva.id.slice(0, 6)}`,
-                  estado: cajaActiva.estado,
+                  id: cajaJornada.id,
+                  nombre: `Caja ${cajaJornada.id.slice(0, 6)}`,
+                  estado: cajaJornada.estado,
                 }
               : null
           }

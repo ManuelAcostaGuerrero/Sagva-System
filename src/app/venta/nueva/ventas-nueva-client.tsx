@@ -204,7 +204,7 @@ export function VentasNuevaClient({
   const saldoPendiente = Math.max(total - totalPagado, 0);
   const vuelto = Math.max(totalPagado - total, 0);
   const puedeAgregarPago = lineas.length > 0 && total > 0 && saldoPendiente > 0;
-  const puedeCobroRapido = lineas.length > 0 && total > 0 && !!cajaActiva && pagos.length === 0;
+  const puedeCobroRapido = lineas.length > 0 && total > 0 && pagos.length === 0;
 
   const lineasPayload = JSON.stringify(
     lineas.map((linea) => ({
@@ -591,11 +591,16 @@ export function VentasNuevaClient({
                 <label className="sagva-label">Caja activa</label>
                 <input
                   className="sagva-field"
-                  value={cajaActiva ? `${cajaActiva.nombre} - ${cajaActiva.estado}` : "Sin caja abierta"}
+                  value={cajaActiva ? `${cajaActiva.nombre} - ${cajaActiva.estado}` : "Sin caja abierta · venta permitida"}
                   readOnly
                 />
               </div>
             </div>
+            {!cajaActiva ? (
+              <p role="status" className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                Puedes cobrar ahora. La venta se registrará con tu usuario y se asociará a tu caja al abrirla en esta jornada.
+              </p>
+            ) : null}
           </div>
 
           <div className="sagva-panel overflow-visible">
@@ -996,7 +1001,7 @@ export function VentasNuevaClient({
               type="submit"
               name="accion"
               value="cobrar"
-              disabled={!lineas.length || saldoPendiente > 0 || !cajaActiva || enviandoVenta}
+              disabled={!lineas.length || saldoPendiente > 0 || enviandoVenta}
               onClick={limpiarCobroRapido}
               className="sagva-button-primary disabled:cursor-not-allowed disabled:opacity-50"
             >

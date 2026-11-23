@@ -72,3 +72,13 @@ Controlar el flujo de caja por turno y mantener registros definitivos de apertur
 - Definir conceptos permitidos para ingresos/retiros.
 - Definir estados finales de caja.
 - Definir formato exacto de solicitud de corrección.
+
+## Ventas antes de abrir caja (23-11-2026)
+- Se puede atender y **cobrar** con o sin caja abierta. La venta conserva `vendedorId`, `sucursalId`, pagos, folio y su fecha real. Si todavía no existe caja activa del usuario, se guarda `cajaId=null`.
+- Al abrir caja en la misma sucursal, el sistema vincula las ventas cobradas sin caja del **mismo usuario** y **mismo día comercial**, sin mezclar otras sesiones ni otras jornadas. Crea movimientos de pagos con nota «Antes de apertura».
+- La reconciliación se hace dentro de una transacción y solo actualiza ventas con `cajaId=null`, para no duplicar movimientos.
+- Se identifica la jornada por la zona `America/Santiago` y la variable `SAGVA_HORA_CORTE_DIA="HH:MM"` (hora del inicio de una jornada / corte de la anterior).
+- La hora de corte **no existía guardada en el esquema**. Si no se configura la variable, se utiliza temporalmente `00:00`. En negocios que cierran después de medianoche es obligatorio definir su hora real de corte antes de utilizar esta clasificación de jornadas.
+- No se reatribuyen ventas de otro usuario al abrir caja. La caja activa se consulta por usuario y sucursal.
+- La apertura no borra ventas ni altera el stock. No requiere nuevas columnas ni migración de SQLite.
+- En el arqueo, los movimientos de venta por tarjeta, crédito y transferencia se registran para trazabilidad, pero no suman al **efectivo esperado**. Solo las ventas con método EFECTIVO, la apertura y los ingresos/retiros afectan ese cálculo.

@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/session";
 import type { Prisma } from "@prisma/client";
 import { puedeAutorizarDescuento } from "@/lib/venta-permisos";
 import { precioPorCantidad, type TramoMayorista } from "@/lib/venta-precios";
+import { diaOperativo } from "@/lib/dia-operativo";
 
 type LineaVentaInput = {
   articuloId: string;
@@ -71,7 +72,6 @@ export async function guardarVentaAction(formData: FormData) {
   const quickMetodo = stringValue(formData, "quickMetodo").toLowerCase();
   const accion = quickMetodo ? "cobrar" : stringValue(formData, "accion") || "pendiente";
   const sucursalId = stringValue(formData, "sucursalId");
-  const cajaId = stringValue(formData, "cajaId");
   const clienteNombre = stringValue(formData, "cliente");
   const observacion = stringValue(formData, "observacion");
   const efectivoRecibido = Number(stringValue(formData, "efectivoRecibido") || 0);
@@ -98,10 +98,6 @@ export async function guardarVentaAction(formData: FormData) {
 
   if (!lineas.length) {
     redirect("/venta/nueva?error=sin_productos");
-  }
-
-  if (accion === "cobrar" && !cajaId) {
-    redirect("/venta/nueva?error=sin_caja");
   }
 
   const lineasValidas = lineas.map((linea) => {
@@ -177,14 +173,21 @@ export async function guardarVentaAction(formData: FormData) {
   if (lineasValidas.some(linea => linea.descuento > 0) && !autorizadoDescuento) {
     return { error: "Descuento no autorizado. Solicita a un administrador con permisos." };
   }
-  if (accion === "cobrar") {
-    const caja = await prisma.caja.findFirst({
-      where: { id: cajaId, sucursalId, estado: "abierta" }, select: { id: true }
-    });
-    if (!caja) return { error: "La caja está cerrada o no corresponde a la sucursal." };
-  }
   try {
     await prisma.$transaction(async (tx) => {
+      // Asociar la venta únicamente a la caja de este usuario y jornada.
+      // Si aún no existe, la venta se cobra dejando cajaId = null.
+      const momentoVenta = new Date();
+      const cajaUsuario = accion === "cobrar"
+        ? await tx.caja.findFirst({
+            where: { sucursalId, usuarioId: user.id, estado: "abierta" },
+            orderBy: { fechaApertura: "desc" },
+            select: { id: true, fechaApertura: true }
+          })
+        : null;
+      const cajaIdAsociada = cajaUsuario &&
+        diaOperativo(cajaUsuario.fechaApertura) === diaOperativo(momentoVenta)
+        ? cajaUsuario.id : null;
       // Verificar en la misma transacción que ningún precio/estado cambió desde que se armó la venta.
       const ids = [...new Set(lineasValidas.map((linea) => linea.articuloId))];
       const [articulos, precios, reglas] = await Promise.all([
@@ -229,7 +232,7 @@ export async function guardarVentaAction(formData: FormData) {
           vendedorId: user.id,
           clienteId: null,
           sucursalId,
-          cajaId: cajaId || null,
+          cajaId: cajaIdAsociada,
           total,
           totalPagado,
           saldoPendiente,
@@ -297,10 +300,10 @@ export async function guardarVentaAction(formData: FormData) {
           },
         });
 
-        if (accion === "cobrar" && cajaId) {
+        if (accion === "cobrar" && cajaIdAsociada) {
           await tx.cajaMovimiento.create({
             data: {
-              cajaId,
+              cajaId: cajaIdAsociada,
               tipo: "venta",
               monto: pago.monto,
               concepto: `BOLETA:${folioDefinitivo ?? venta.id}`,
