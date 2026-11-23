@@ -125,28 +125,44 @@ function generarCodigoInterno() {
 function precioDataFromForm(formData: FormData, conservarPrecioPublico = false) {
   const precioConIvaInput = numeroDecimalValidado(formData, "precioConIva");
   const precioSinIvaInput = numeroDecimalValidado(formData, "precioSinIva", 5);
-  const margen = conservarPrecioPublico ? 0 : numeroDecimalValidado(formData, "margen") / 100;
   const tipoImpuesto = stringValue(formData, "tipoImpuesto") || "IVA";
   const ultimoEditado = stringValue(formData, "ultimoPrecioEditado");
 
   // La edición más reciente manda: no ignorar un precio con IVA modificado.
-  const precioSinIva = tipoImpuesto === "exento"
+  const precioSinIva = ultimoEditado === "ninguno"
+    ? precioSinIvaInput
+    : tipoImpuesto === "exento"
     ? (ultimoEditado === "sin" ? precioSinIvaInput : precioConIvaInput)
     : ultimoEditado === "sin"
       ? precioSinIvaInput
       : calcularPrecioSinIVA(precioConIvaInput);
-  const precioConIva = tipoImpuesto === "exento"
+  const precioConIva = ultimoEditado === "ninguno"
+    ? precioConIvaInput
+    : tipoImpuesto === "exento"
     ? precioSinIva
     : ultimoEditado === "sin"
       ? calcularPrecioConIVA(precioSinIva)
       : precioConIvaInput;
+
+  // El precio indicado por el usuario es la fuente de verdad; el recargo se
+  // deriva de él para conservar el valor exacto aunque el porcentaje se redondee.
+  const precioIngresado = !conservarPrecioPublico && formData.has("precioPublico")
+    ? numeroDecimalValidado(formData, "precioPublico")
+    : null;
+  const margenAnterior = !conservarPrecioPublico && precioIngresado === null
+    ? numeroDecimalValidado(formData, "margen") / 100
+    : 0;
+  const precioPublico = precioIngresado ?? calcularPrecioPublico(precioConIva, margenAnterior);
+  const margen = precioIngresado !== null && precioConIva > 0
+    ? Number((precioPublico / precioConIva - 1).toFixed(10))
+    : margenAnterior;
 
   return {
     precioConIva,
     precioSinIva,
     margen,
     // ILA se guarda en el artículo como referencia tributaria; no altera el precio comercial.
-    precioPublico: calcularPrecioPublico(precioConIva, margen),
+    precioPublico,
     // Se conservan columnas anteriores por compatibilidad pero las nuevas reglas van en tabla propia.
     precioMayorista: null,
     cantidadMinimaMayorista: null

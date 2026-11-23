@@ -54,6 +54,7 @@ export function ArticulosListadoClient({
   const [filas, setFilas] = useState(articulos);
   const [marcasDisponibles, setMarcasDisponibles] = useState(marcas);
   const [busqueda, setBusqueda] = useState("");
+  const [busquedaEnFoco, setBusquedaEnFoco] = useState(false);
   const [tipo, setTipo] = useState("");
   const [familia, setFamilia] = useState("");
   const [estado, setEstado] = useState("");
@@ -69,7 +70,7 @@ export function ArticulosListadoClient({
   const filtrados = useMemo(() => {
     const q = normalizar(busqueda);
     return filas.filter(articulo =>
-      (!q || [articulo.nombre, articulo.codigoProducto, articulo.codigoBarra]
+      (!q || [articulo.nombre, articulo.id, articulo.codigoProducto, articulo.codigoBarra]
         .some(texto => normalizar(texto).includes(q))) &&
       (!tipo || articulo.tipoArticulo === tipo) &&
       (!familia || articulo.familiaId === familia) &&
@@ -171,8 +172,9 @@ export function ArticulosListadoClient({
               <input
                 className="sagva-field pl-9"
                 value={busqueda} onChange={e=>cambiarFiltro(setBusqueda,e.target.value)}
+                onFocus={()=>setBusquedaEnFoco(true)} onBlur={()=>setBusquedaEnFoco(false)}
                 onKeyDown={e=>{if(e.key==="Enter")e.preventDefault();}}
-                placeholder="Escribe o escanea un código"
+                placeholder={busquedaEnFoco ? "" : "Escribe o escanea un código"}
               />
             </div>
           </label>
@@ -189,8 +191,8 @@ export function ArticulosListadoClient({
             <span className="sagva-label">Estado</span>
             <select className="sagva-field" value={estado} onChange={e=>cambiarFiltro(setEstado,e.target.value)}>
               <option value="">Todos</option>
-              <option value="activo">Activo</option>
-              <option value="inactivo">Inactivo</option>
+              <option value="activo">Habilitado</option>
+              <option value="inactivo">Deshabilitado</option>
             </select>
           </label>
           <label>
@@ -248,7 +250,7 @@ export function ArticulosListadoClient({
                   <th><input type="checkbox" aria-label="Seleccionar artículos visibles"
                     checked={todasVisiblesSeleccionadas} onChange={alternarPagina}/></th>
                 ) : null}
-                <th>Código</th><th>Artículo</th><th>Tipo</th><th>Familia</th><th>Marca</th>
+                <th>Código de barras</th><th>Artículo</th><th>Tipo</th><th>Familia</th><th>Marca</th>
                 <th>Precio público</th>
                 {mostrarGanancia ? <th>Ganancia estimada</th> : null}
                 <th>Stock</th><th>Estado</th><th>Acciones</th>
@@ -262,11 +264,8 @@ export function ArticulosListadoClient({
                       aria-label={"Seleccionar "+articulo.nombre}
                       onChange={e=>alternar(articulo.id,e.target.checked)}/></td>
                   ) : null}
-                  <td className="font-semibold">{articulo.codigoProducto}</td>
-                  <td>
-                    {articulo.nombre}
-                    {articulo.codigoBarra ? <p className="text-xs text-slate-400">{articulo.codigoBarra}</p> : null}
-                  </td>
+                  <td className="font-semibold">{articulo.codigoBarra || "—"}</td>
+                  <td>{articulo.nombre}</td>
                   <td>{articulo.tipoArticulo}</td>
                   <td>{opcionNombre(familias,articulo.familiaId)}</td>
                   <td>{opcionNombre(marcasDisponibles,articulo.marcaId)}</td>
@@ -277,7 +276,7 @@ export function ArticulosListadoClient({
                     </td>
                   ) : null}
                   <td>{articulo.stock}</td>
-                  <td>{articulo.estado}</td>
+                  <td>{articulo.estado === "activo" ? "Habilitado" : articulo.estado === "inactivo" ? "Deshabilitado" : articulo.estado}</td>
                   <td className="whitespace-nowrap">
                     {puedeEditar ? (
                       <button type="button" onClick={()=>comenzarEdicion(articulo)}
@@ -318,7 +317,7 @@ export function ArticulosListadoClient({
                         </label>
                         <label><span className="sagva-label">Estado</span>
                           <select className="sagva-field" value={borrador.estado} onChange={e=>setBorrador(a=>a?{...a,estado:e.target.value==="inactivo"?"inactivo":"activo"}:a)}>
-                            <option value="activo">Activo</option><option value="inactivo">Inactivo</option>
+                            <option value="activo">Habilitado</option><option value="inactivo">Deshabilitado</option>
                           </select>
                         </label>
                         <div className="flex gap-2">

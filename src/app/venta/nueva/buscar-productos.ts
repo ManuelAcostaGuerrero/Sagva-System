@@ -14,12 +14,16 @@ export type ProductoBusquedaVenta = {
   reglasMayoristas: Array<{ cantidadMinima: number; precioUnitario: number }>;
 };
 
+export type ResultadoBusquedaVenta =
+  | { ok: true; productos: ProductoBusquedaVenta[] }
+  | { ok: false; motivo: "sesion" };
+
 /** Consulta paginada y limitada en SQLite, no precarga todo el catálogo al navegador. */
-export async function buscarProductosParaCajaAction(query: string, sucursalId: string): Promise<ProductoBusquedaVenta[]> {
+export async function buscarProductosParaCajaAction(query: string, sucursalId: string): Promise<ResultadoBusquedaVenta> {
   const usuario = await getCurrentUser();
-  if (!usuario || usuario.estado !== "activo") throw new Error("Se requiere iniciar sesión.");
+  if (!usuario || usuario.estado !== "activo") return { ok: false, motivo: "sesion" };
   const q = typeof query === "string" ? query.trim().slice(0, 100) : "";
-  if (!q || typeof sucursalId !== "string" || !sucursalId) return [];
+  if (!q || typeof sucursalId !== "string" || !sucursalId) return { ok: true, productos: [] };
   const exacto = await prisma.articulo.findFirst({
     where: { estado: "activo", OR: [{ codigoBarra: q }, { codigoProducto: q }] },
     select: { id: true }
@@ -54,7 +58,7 @@ export async function buscarProductosParaCajaAction(query: string, sucursalId: s
     : null;
   const encontrados = exactoCompleto ? [exactoCompleto, ...articulos] : articulos;
   encontrados.sort((a,b) => (a.id === exacto?.id ? -1 : b.id === exacto?.id ? 1 : 0));
-  return encontrados.filter(a => a.precios.length > 0 && a.tipoArticulo !== "PROMOCION").slice(0,20).map(a => {
+  const productos = encontrados.filter(a => a.precios.length > 0 && a.tipoArticulo !== "PROMOCION").slice(0,20).map(a => {
     const precio = a.precios[0];
     const reglas = a.reglasMayoristas.map(r => ({
       cantidadMinima: Number(r.cantidadMinima), precioUnitario: Number(r.precioUnitario)
@@ -74,4 +78,5 @@ export async function buscarProductosParaCajaAction(query: string, sucursalId: s
       reglasMayoristas: reglas
     };
   });
+  return { ok: true, productos };
 }

@@ -29,6 +29,7 @@ type PreciosImpuestosProps = {
   precioSinIvaInicial: number;
   precioPublicoInicial: number;
   margenInicial: number;
+  precioExistente: boolean;
 };
 
 function valorNumerico(value: string) {
@@ -37,6 +38,17 @@ function valorNumerico(value: string) {
 
 function toField(value: number) {
   return String(roundMoney(value));
+}
+
+function margenEnEdicionValido(value: string) {
+  if (!/^-?\d{0,12}(?:[.,]\d{0,2})?$/.test(value)) return false;
+  const numero = Number(value.replace(",", "."));
+  return !Number.isFinite(numero) || numero >= -100;
+}
+
+function valorMargen(value: string) {
+  const numero = Number(value.replace(",", "."));
+  return Number.isFinite(numero) ? numero : 0;
 }
 
 function moneda(value: number) {
@@ -53,17 +65,22 @@ export function ArticuloPreciosImpuestos({
   precioConIvaInicial,
   precioSinIvaInicial,
   precioPublicoInicial,
-  margenInicial
+  margenInicial,
+  precioExistente
 }: PreciosImpuestosProps) {
   const [tipoImpuesto, setTipoImpuesto] = useState(tipoImpuestoInicial);
   const [tasaAdicional, setTasaAdicional] = useState(String(impuestoAdicionalInicial));
   const [precioConIva, setPrecioConIva] = useState(String(precioConIvaInicial));
   const [precioSinIva, setPrecioSinIva] = useState(String(precioSinIvaInicial));
   const [margen, setMargen] = useState(String(margenInicial));
+  const [precioIngresado, setPrecioIngresado] = useState(String(precioPublicoInicial));
+  const [calcularDesdeMargen, setCalcularDesdeMargen] = useState(!precioExistente);
   // Conservar el precio de venta exacto al editar solo datos de clasificación, marca o stock.
-  const [conservarPrecioPublico, setConservarPrecioPublico] = useState(precioPublicoInicial > 0);
+  const [conservarPrecioPublico, setConservarPrecioPublico] = useState(precioExistente);
   const [precioModificado, setPrecioModificado] = useState(false);
-  const [ultimoEditado, setUltimoEditado] = useState<"con" | "sin">(precioSinIvaInicial > 0 ? "sin" : "con");
+  const [ultimoEditado, setUltimoEditado] = useState<"con" | "sin" | "ninguno">(
+    precioExistente ? "ninguno" : precioSinIvaInicial > 0 ? "sin" : "con"
+  );
 
   const exento = tipoImpuesto === "exento";
   const tasa = exento ? 0 : valorNumerico(tasaAdicional);
@@ -72,15 +89,24 @@ export function ArticuloPreciosImpuestos({
   const ilaCompra = roundMoney(neto * tasa / 100);
   const costoTotal = calcularCostoConImpuestoAdicional(bruto, neto, tasa);
   // El ILA se conserva para simulación/compra, pero no fija el precio comercial.
-  const precioPublico = conservarPrecioPublico
-    ? precioPublicoInicial
-    : calcularPrecioPublico(bruto, valorNumerico(margen) / 100);
-  const recargoConservado = bruto > 0 ? (precioPublicoInicial / bruto - 1) * 100 : 0;
-  const precioSimuladoConIla = calcularPrecioPublico(costoTotal, valorNumerico(margen) / 100);
+  const precioPublico = calcularDesdeMargen
+    ? calcularPrecioPublico(bruto, valorMargen(margen) / 100)
+    : valorNumerico(precioIngresado);
+  const recargo = bruto > 0 ? (precioPublico / bruto - 1) * 100 : 0;
+  const precioSimuladoConIla = calcularPrecioPublico(costoTotal, recargo / 100);
   const tasaDesconocida = !TASAS_BEBIDAS.some((item) => item.value === tasaAdicional);
+
+  // Cambiar el costo de un artículo existente no debe alterar el precio elegido.
+  function fijarPrecioAntesDeCambiarCosto() {
+    if (precioExistente && calcularDesdeMargen) {
+      setPrecioIngresado(toField(precioPublico));
+      setCalcularDesdeMargen(false);
+    }
+  }
 
   function editarConIva(value: string) {
     if (!decimalEnEdicionValido(value)) return;
+    fijarPrecioAntesDeCambiarCosto();
     setUltimoEditado("con");
     setPrecioModificado(true);
     setPrecioConIva(value);
@@ -89,6 +115,7 @@ export function ArticuloPreciosImpuestos({
 
   function editarSinIva(value: string) {
     if (!decimalEnEdicionValido(value, 5)) return;
+    fijarPrecioAntesDeCambiarCosto();
     setUltimoEditado("sin");
     setPrecioModificado(true);
     setPrecioSinIva(value);
@@ -96,18 +123,31 @@ export function ArticuloPreciosImpuestos({
   }
 
   function editarMargen(value: string) {
-    if (decimalEnEdicionValido(value)) {
+    if (margenEnEdicionValido(value)) {
       setPrecioModificado(true);
       setMargen(value);
+      setCalcularDesdeMargen(true);
+      setConservarPrecioPublico(false);
     }
   }
 
+  function editarPrecioPublico(value: string) {
+    if (!decimalEnEdicionValido(value)) return;
+    setPrecioIngresado(value);
+    setCalcularDesdeMargen(false);
+    setConservarPrecioPublico(false);
+    setPrecioModificado(true);
+  }
+
   function cambiarTipo(value: string) {
+    fijarPrecioAntesDeCambiarCosto();
     setPrecioModificado(true);
     setTipoImpuesto(value);
     if (value === "exento") setTasaAdicional("0");
     const isExento = value === "exento";
-    if (ultimoEditado === "sin") {
+    const base = ultimoEditado === "ninguno" ? (neto > 0 ? "sin" : "con") : ultimoEditado;
+    setUltimoEditado(base);
+    if (base === "sin") {
       setPrecioConIva(precioSinIva === "" ? "" : toField(isExento ? valorNumerico(precioSinIva) : calcularPrecioConIVA(valorNumerico(precioSinIva))));
     } else {
       setPrecioSinIva(precioConIva === "" ? "" : toField(isExento ? valorNumerico(precioConIva) : calcularPrecioSinIVA(valorNumerico(precioConIva))));
@@ -188,41 +228,38 @@ export function ArticuloPreciosImpuestos({
           inputMode="decimal"
           autoComplete="off"
           className="sagva-field"
-          value={conservarPrecioPublico ? toField(recargoConservado) : margen}
-          readOnly={conservarPrecioPublico}
+          value={calcularDesdeMargen ? margen : toField(recargo)}
+          disabled={bruto <= 0}
           onFocus={() => {
-            if (!conservarPrecioPublico && margen !== "" && valorNumerico(margen) === 0) setMargen("");
+            if (calcularDesdeMargen && margen !== "" && valorMargen(margen) === 0) setMargen("");
           }}
           onChange={(event) => editarMargen(event.target.value)}
-          onBlur={() => setMargen((actual) => normalizarDecimalAlSalir(actual))}
+          onBlur={() => setMargen((actual) => ["-", "-.", "-,"].includes(actual) ? "0" : normalizarDecimalAlSalir(actual))}
         />
+        {bruto <= 0 ? <span className="text-xs text-slate-500">Ingresa un costo mayor a cero para calcular el recargo.</span> : null}
       </label>
       <label>
-        <span className="sagva-label">{conservarPrecioPublico ? "Precio público guardado $" : "Precio público sugerido $"}</span>
+        <span className="sagva-label">Precio público $</span>
         <input
-          className="sagva-field bg-slate-100 font-semibold"
-          value={moneda(precioPublico)}
-          readOnly
-          aria-label={conservarPrecioPublico ? "Precio público guardado, sin cambios" : "Precio público sugerido, calculado desde el costo y recargo"}
+          name="precioPublico"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          className="sagva-field font-semibold"
+          value={calcularDesdeMargen ? toField(precioPublico) : precioIngresado}
+          onFocus={() => {
+            if (!calcularDesdeMargen && valorNumerico(precioIngresado) === 0) setPrecioIngresado("");
+          }}
+          onChange={(event) => editarPrecioPublico(event.target.value)}
+          onBlur={() => setPrecioIngresado((actual) => normalizarDecimalAlSalir(actual))}
         />
       </label>
-      {precioPublicoInicial > 0 ? (
-        <div className="md:col-span-4 text-xs text-slate-600">
-          <span>{conservarPrecioPublico ? "El precio de venta se conserva al editar otros datos." : "El precio se recalculará con el recargo indicado."}</span>{" "}
-          <button
-            type="button"
-            className="font-semibold text-blue-700 underline"
-            onClick={() => {
-              if (conservarPrecioPublico) setMargen(toField(Math.max(0, recargoConservado)));
-              setConservarPrecioPublico(!conservarPrecioPublico);
-              setPrecioModificado(true);
-            }}
-          >{conservarPrecioPublico ? "Modificar recargo y recalcular precio" : "Conservar precio guardado"}</button>
-        </div>
-      ) : null}
+      <p className="md:col-span-4 text-xs text-slate-600">
+        Cambia el precio o el recargo para actualizar la ganancia o pérdida. Al cambiar el costo de un artículo guardado se conserva su precio de venta.
+      </p>
       <div className="md:col-span-4 grid gap-2 rounded-md border border-slate-200 p-3 text-sm md:grid-cols-3" aria-live="polite">
-        <span><strong>Ganancia estimada:</strong> {moneda(precioPublico - bruto)}</span>
-        <span><strong>Recargo sobre costo:</strong> {bruto > 0 ? ((precioPublico / bruto - 1) * 100).toFixed(2) : "0"}%</span>
+        <span><strong>{precioPublico < bruto ? "Pérdida estimada:" : "Ganancia estimada:"}</strong> {moneda(precioPublico - bruto)}</span>
+        <span><strong>Recargo sobre costo:</strong> {bruto > 0 ? `${recargo.toFixed(2)}%` : "No calculable sin costo"}</span>
         <span><strong>Margen sobre venta:</strong> {precioPublico > 0 ? ((precioPublico - bruto) / precioPublico * 100).toFixed(2) : "0"}%</span>
         <p className="text-xs text-slate-500 md:col-span-3">Estimación comercial sin incluir impuestos adicionales y otros costos. No altera el precio público.</p>
       </div>
@@ -239,7 +276,7 @@ export function ArticuloPreciosImpuestos({
         </div>
         <p className="mt-2 text-xs text-slate-600">
           Esta simulación no modifica el precio público, el margen configurado ni el precio guardado.
-          El precio público se calcula solo con el costo con IVA. El ILA puede ser un costo real de compra
+          El recargo se calcula sobre el costo con IVA. El ILA puede ser un costo real de compra
           y reducir la rentabilidad: revisa el total de la factura antes de fijar precios.
           Los montos tributarios definitivos se toman del documento correspondiente.
         </p>

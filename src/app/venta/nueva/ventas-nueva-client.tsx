@@ -113,6 +113,7 @@ export function VentasNuevaClient({
   sucursalNombre,
 }: NuevaVentaClientProps) {
   const [errorVenta, setErrorVenta] = useState("");
+  const [errorBusqueda, setErrorBusqueda] = useState<"sesion" | "consulta" | null>(null);
   const [resultadosBusqueda, setResultadosBusqueda] = useState<ProductoVenta[]>(productos);
   const [buscando, setBuscando] = useState(false);
   const [enviandoVenta, setEnviandoVenta] = useState(false);
@@ -143,19 +144,24 @@ export function VentasNuevaClient({
     const q = busqueda.trim();
     if (!q) {
       setResultadosBusqueda([]);
+      setErrorBusqueda(null);
       setBuscando(false);
       return;
     }
     let cancelado = false;
     setBuscando(true);
+    setErrorBusqueda(null);
     const timeout = setTimeout(async () => {
       try {
-        const encontrados = await buscarProductosParaCajaAction(q, sucursalId);
-        if (!cancelado) setResultadosBusqueda(encontrados);
+        const resultado = await buscarProductosParaCajaAction(q, sucursalId);
+        if (!cancelado) {
+          setResultadosBusqueda(resultado.ok ? resultado.productos : []);
+          setErrorBusqueda(resultado.ok ? null : resultado.motivo);
+        }
       } catch {
         if (!cancelado) {
           setResultadosBusqueda([]);
-          setErrorVenta("No se pudo consultar el catálogo. Vuelve a intentarlo.");
+          setErrorBusqueda("consulta");
         }
       } finally {
         if (!cancelado) setBuscando(false);
@@ -170,14 +176,21 @@ export function VentasNuevaClient({
     const q = busqueda.trim();
     if (!q) return;
     try {
-      const encontrados = await buscarProductosParaCajaAction(q, sucursalId);
+      const resultado = await buscarProductosParaCajaAction(q, sucursalId);
+      if (!resultado.ok) {
+        setResultadosBusqueda([]);
+        setErrorBusqueda(resultado.motivo);
+        return;
+      }
+      setErrorBusqueda(null);
+      const encontrados = resultado.productos;
       setResultadosBusqueda(encontrados);
       const exacto = encontrados.find(p => p.codigoBarra === q || p.codigoProducto === q);
       const elegido = exacto ?? encontrados[0];
       if (elegido) agregarProducto(elegido);
       else setErrorVenta("No existe un artículo activo con ese código o nombre.");
     } catch {
-      setErrorVenta("Error al buscar el código. Intenta nuevamente.");
+      setErrorBusqueda("consulta");
     }
   }
 
@@ -650,7 +663,11 @@ export function VentasNuevaClient({
 
                     {productosFiltrados.length === 0 ? (
                       <div className="px-4 py-5 text-sm text-slate-500">
-                        {buscando ? "Buscando en el catálogo..." : "No se encontraron productos para esa búsqueda."}
+                        {buscando ? "Buscando en el catálogo..." : errorBusqueda === "sesion" ? (
+                          <span role="alert">Inicia sesión para buscar productos. <Link href="/login" className="font-semibold text-blue-700 underline">Iniciar sesión</Link></span>
+                        ) : errorBusqueda === "consulta" ? (
+                          <span role="alert">No se pudo consultar el catálogo. Vuelve a intentarlo.</span>
+                        ) : "No se encontraron productos para esa búsqueda."}
                       </div>
                     ) : null}
                   </div>

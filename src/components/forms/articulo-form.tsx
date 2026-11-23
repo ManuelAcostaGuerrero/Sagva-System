@@ -62,8 +62,8 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
           <label>
             <span className="sagva-label">Estado</span>
             <select name="estado" className="sagva-field" defaultValue={articulo?.estado ?? "activo"}>
-              <option value="activo">Activo</option>
-              <option value="inactivo">Inactivo</option>
+              <option value="activo">Habilitado</option>
+              <option value="inactivo">Deshabilitado</option>
             </select>
           </label>
           <label className="md:col-span-2">
@@ -158,6 +158,7 @@ export function ArticuloForm({ familias, subfamilias, marcas, proveedores, artic
           precioSinIvaInicial={Number(precio?.precioSinIva ?? 0)}
           precioPublicoInicial={Number(precio?.precioPublico ?? 0)}
           margenInicial={Math.round(Number(precio?.margen ?? 0.3) * 10000) / 100}
+          precioExistente={Boolean(precio)}
         />
       </section>
 

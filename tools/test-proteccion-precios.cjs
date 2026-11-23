@@ -28,27 +28,67 @@ const jsx = { jsx: (type, props) => ({ type, props: props || {} }), jsxs: (type,
 const component = loadTS('src/components/forms/articulo-precios-impuestos.tsx', n =>
   n === 'react' ? react : n === 'react/jsx-runtime' ? jsx : n === '@/lib/validacion-decimal' ? decimal :
     n === '@/utils/calculations/prices' ? prices : require(n));
-function render() { cursor = 0; return component.ArticuloPreciosImpuestos({ tipoImpuestoInicial: 'IVA', impuestoAdicionalInicial: 0, precioConIvaInicial: 119.6, precioSinIvaInicial: 100.5, precioPublicoInicial: 1000, margenInicial: 30 }); }
+const defaults = { tipoImpuestoInicial: 'IVA', impuestoAdicionalInicial: 0, precioConIvaInicial: 119.6, precioSinIvaInicial: 100.5, precioPublicoInicial: 1000, margenInicial: 30, precioExistente: true };
+function render(props = {}) { cursor = 0; return component.ArticuloPreciosImpuestos({ ...defaults, ...props }); }
 function nodes(value) { if (!value) return []; if (Array.isArray(value)) return value.flatMap(nodes); if (typeof value !== 'object') return []; return [value, ...nodes(value.props?.children)]; }
 function field(tree, name) { const match = nodes(tree).find(x => x.props?.name === name); assert.ok(match, `Falta ${name}`); return match; }
+function words(value) { if (Array.isArray(value)) return value.map(words).join(' '); if (typeof value === 'object' && value) return words(value.props?.children); return value == null ? '' : String(value); }
+function change(tree, name, value) { field(tree, name).props.onChange({ target: { value } }); }
 let tree = render();
 assert.equal(field(tree, 'actualizarPrecio').props.value, 'no');
-const publicValue = nodes(tree).find(x => x.props?.['aria-label'] === 'Precio público guardado, sin cambios').props.value;
-field(tree, 'precioSinIva').props.onChange({ target: { value: '9.12345' } });
+assert.equal(field(tree, 'precioPublico').props.value, '1000');
+assert.equal(field(tree, 'precioPublico').props.readOnly, undefined);
+assert.equal(field(tree, 'margen').props.value, '736.12');
+assert.equal(field(tree, 'ultimoPrecioEditado').props.value, 'ninguno');
+change(tree, 'precioSinIva', '9.12345');
 tree = render();
 assert.equal(field(tree, 'precioSinIva').props.value, '9.12345');
 assert.equal(field(tree, 'precioConIva').props.value, '10.86');
 assert.equal(field(tree, 'conservarPrecioPublico').props.value, 'si');
 assert.equal(field(tree, 'actualizarPrecio').props.value, 'si');
-assert.equal(nodes(tree).find(x => x.props?.['aria-label'] === 'Precio público guardado, sin cambios').props.value, publicValue);
-const unlock = nodes(tree).find(x => x.type === 'button' && x.props.children === 'Modificar recargo y recalcular precio');
-assert.ok(unlock); unlock.props.onClick(); tree = render();
+assert.equal(field(tree, 'precioPublico').props.value, '1000');
+change(tree, 'precioPublico', '8');
+tree = render();
+assert.equal(field(tree, 'margen').props.value, '-26.34');
+assert.match(words(tree), /Pérdida estimada:/);
 assert.equal(field(tree, 'conservarPrecioPublico').props.value, 'no');
+change(tree, 'margen', '-20');
+tree = render();
+assert.equal(field(tree, 'precioPublico').props.value, String(prices.calcularPrecioPublico(10.86, -0.2)));
+const precioElegido = field(tree, 'precioPublico').props.value;
+change(tree, 'margen', '-101');
+tree = render();
+assert.equal(field(tree, 'margen').props.value, '-20');
+change(tree, 'precioConIva', '20');
+tree = render();
+assert.equal(field(tree, 'precioPublico').props.value, precioElegido);
+assert.equal(field(tree, 'precioSinIva').props.value, '16.81');
 
-let saved = null, savedArticle = null, writes = 0;
+hooks = [];
+const zeroProps = { precioConIvaInicial: 0, precioSinIvaInicial: 0, precioPublicoInicial: 0, precioExistente: false };
+tree = render(zeroProps);
+assert.equal(field(tree, 'margen').props.disabled, true);
+change(tree, 'precioSinIva', '100');
+tree = render(zeroProps);
+assert.equal(field(tree, 'margen').props.disabled, false);
+assert.equal(field(tree, 'precioPublico').props.value, '154.7');
+change(tree, 'precioPublico', '80,5');
+tree = render(zeroProps);
+assert.equal(field(tree, 'margen').props.value, '-32.35');
+assert.match(words(tree), /Pérdida estimada:/);
+
+hooks = [];
+const existingZero = { precioPublicoInicial: 0, precioExistente: true };
+tree = render(existingZero);
+change(tree, 'precioConIva', '200');
+tree = render(existingZero);
+assert.equal(field(tree, 'precioPublico').props.value, '0');
+assert.equal(field(tree, 'conservarPrecioPublico').props.value, 'si');
+
+let saved = null, savedArticle = null, writes = 0, storedPrice = 1000;
 const tx = {
   articulo: { findUnique: async () => ({ nombre: '  Prueba  ' }), update: async value => { savedArticle = value.data; } },
-  articuloPrecio: { findFirst: async () => ({ precioPublico: 1000 }), updateMany: async () => { writes++; }, create: async v => { saved = v.data; } },
+  articuloPrecio: { findFirst: async () => ({ precioPublico: storedPrice }), updateMany: async () => { writes++; }, create: async v => { saved = v.data; } },
   proveedorProductoAsociado: { findMany: async () => [] }, articuloReglaMayorista: { deleteMany: async () => {} }
 };
 const prisma = { $transaction: async fn => fn(tx) };
@@ -57,14 +97,32 @@ const actions = loadTS('src/app/actions/articulos.actions.ts', n =>
     n === 'next/cache' ? { revalidatePath() {} } : n === 'next/navigation' ? { redirect() {} } : require(n));
 (async () => {
   const input = new FormData();
-  for (const [key, value] of Object.entries({ nombre: '  Prueba  ', tipoArticulo: 'PRODUCTO', tipoImpuesto: 'IVA_RETENIDO', precioSinIva: '9.12345', precioConIva: '10.86', margen: '30.00', ultimoPrecioEditado: 'sin', reglasMayoristas: '[]', conservarPrecioPublico: 'si', actualizarPrecio: 'no' })) input.set(key, value);
+  for (const [key, value] of Object.entries({ nombre: '  Prueba  ', tipoArticulo: 'PRODUCTO', tipoImpuesto: 'IVA_RETENIDO', precioSinIva: '9.12345', precioConIva: '10.86', precioPublico: '9999', margen: '-20', ultimoPrecioEditado: 'sin', reglasMayoristas: '[]', conservarPrecioPublico: 'si', actualizarPrecio: 'no' })) input.set(key, value);
   await actions.actualizarArticuloAction('prueba', input);
   assert.equal(writes, 0); assert.equal(saved, null); assert.equal(savedArticle.nombre, '  Prueba  ');
-  input.set('actualizarPrecio', 'si'); input.set('margen', '-1');
+  input.set('actualizarPrecio', 'si');
   await actions.actualizarArticuloAction('prueba', input);
   assert.equal(saved.precioPublico, 1000); assert.equal(saved.precioSinIva, 9.12345); assert.equal(saved.precioConIva, 10.86);
-  input.set('conservarPrecioPublico', 'no'); input.set('margen', '20');
+  storedPrice = 0;
+  await actions.actualizarArticuloAction('prueba', input);
+  assert.equal(saved.precioPublico, 0); assert.equal(saved.margen, -1);
+  input.set('conservarPrecioPublico', 'no'); input.set('precioPublico', '8,00');
+  await actions.actualizarArticuloAction('prueba', input);
+  assert.equal(saved.precioPublico, 8);
+  assert.equal(saved.margen, Number((8 / 10.86 - 1).toFixed(10)));
+  input.set('precioPublico', String(prices.calcularPrecioPublico(10.86, 0.2)));
   await actions.actualizarArticuloAction('prueba', input);
   assert.equal(saved.precioPublico, prices.calcularPrecioPublico(10.86, 0.2));
-  console.log('Precios, conservación y actualización explícita: correctos.');
+  input.set('ultimoPrecioEditado', 'ninguno'); input.set('precioSinIva', '100');
+  input.set('precioConIva', '110'); input.set('precioPublico', '150');
+  await actions.actualizarArticuloAction('prueba', input);
+  assert.equal(saved.precioSinIva, 100); assert.equal(saved.precioConIva, 110);
+  assert.equal(saved.precioPublico, 150);
+  input.set('precioPublico', '-1');
+  await assert.rejects(actions.actualizarArticuloAction('prueba', input), /precioPublico/);
+  input.delete('precioPublico'); input.set('margen', '20'); input.set('ultimoPrecioEditado', 'sin');
+  input.set('precioSinIva', '9.12345'); input.set('precioConIva', '10.86');
+  await actions.actualizarArticuloAction('prueba', input);
+  assert.equal(saved.precioPublico, prices.calcularPrecioPublico(10.86, 0.2));
+  console.log('Precio editable, recargo, pérdidas y conservación: correctos.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
