@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Edit, Plus, Save, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Edit, Plus, Save, Search } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { guardarClasificacionRapidaAction } from "@/app/actions/articulos-rapido.actions";
+import { ordenarArticulos, siguienteOrdenArticulo, type CampoOrdenArticulo, type OrdenArticulo } from "@/lib/ordenar-articulos";
 
 type Categoria = { id: string; nombre: string };
 type Subfamilia = Categoria & { familiaId: string };
@@ -55,6 +56,7 @@ export function ArticulosListadoClient({
   const [familia, setFamilia] = useState("");
   const [estado, setEstado] = useState("");
   const [pagina, setPagina] = useState(1);
+  const [orden, setOrden] = useState<OrdenArticulo | null>(null);
   const [editando, setEditando] = useState<string | null>(null);
   const [borrador, setBorrador] = useState<Clasificacion | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -76,9 +78,41 @@ export function ArticulosListadoClient({
     );
   }, [filas, busqueda, tipo, familia, estado]);
 
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
+  const ordenados = useMemo(
+    () => ordenarArticulos(filtrados, orden, familias, marcas),
+    [filtrados, orden, familias, marcas]
+  );
+  const totalPaginas = Math.max(1, Math.ceil(ordenados.length / POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);
-  const visibles = filtrados.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
+  const visibles = ordenados.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
+
+  function cambiarOrden(campo: CampoOrdenArticulo) {
+    setOrden(actual => siguienteOrdenArticulo(actual, campo));
+    setPagina(1);
+  }
+
+  function encabezadoOrden(campo: CampoOrdenArticulo, etiqueta: string) {
+    const activo = orden?.campo === campo;
+    const direccion = activo ? orden.direccion : null;
+    const siguiente = activo ? (direccion === "asc" ? "descendente" : "ascendente")
+      : (["precioPublico", "ganancia", "stock"].includes(campo) ? "descendente" : "ascendente");
+    return (
+      <th key={campo} aria-sort={!activo ? "none" : direccion === "asc" ? "ascending" : "descending"}>
+        <button
+          type="button"
+          onClick={() => cambiarOrden(campo)}
+          aria-label={`Ordenar ${etiqueta} de forma ${siguiente}`}
+          title={`Ordenar ${etiqueta} de forma ${siguiente}`}
+          className={`inline-flex w-full items-center gap-1.5 whitespace-nowrap text-left font-semibold transition-colors hover:text-[#064ea4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#064ea4] ${activo ? "text-[#064ea4]" : ""}`}
+        >
+          <span>{etiqueta}</span>
+          {direccion === "asc" ? <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            : direccion === "desc" ? <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              : <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />}
+        </button>
+      </th>
+    );
+  }
 
   function cambiarFiltro(setter: (value:string)=>void, value:string) {
     setter(value);
@@ -178,10 +212,16 @@ export function ArticulosListadoClient({
           <table className="sagva-table">
             <thead>
               <tr>
-                <th>Código de barras</th><th>Artículo</th><th>Tipo</th><th>Familia</th><th>Marca</th>
-                <th>Precio público</th>
-                {mostrarGanancia ? <th>Ganancia estimada</th> : null}
-                <th>Stock</th><th>Estado</th><th>Acciones</th>
+                {encabezadoOrden("codigoBarra", "Código de barras")}
+                {encabezadoOrden("nombre", "Artículo")}
+                {encabezadoOrden("tipoArticulo", "Tipo")}
+                {encabezadoOrden("familia", "Familia")}
+                {encabezadoOrden("marca", "Marca")}
+                {encabezadoOrden("precioPublico", "Precio público")}
+                {mostrarGanancia ? encabezadoOrden("ganancia", "Ganancia estimada") : null}
+                {encabezadoOrden("stock", "Stock")}
+                {encabezadoOrden("estado", "Estado")}
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>

@@ -145,3 +145,12 @@ Definir los datos base de cada artículo: códigos, familia, subfamilia, marca, 
 - Guardar `PRECIO` exactamente como precio público (no recalcularlo con MARGEN). Guardar `COSTO` como costo sin IVA, calcular costo con IVA al 19% y derivar recargo sobre dicho costo. No importar `MARGEN` ni `VENTA_NETO` del Excel.
 - El importador es una utilidad manual con análisis previo, controles de colisiones e informe de casos pendientes. Los nombres repetidos o marcados como duplicado, eliminar o prueba quedan pendientes de revisión. Si un artículo ya existe, compara también sus precios, costos, stock, tipo, impuestos y clasificación; cualquier diferencia queda pendiente sin sobrescribir. No se importa durante `git pull`, actualización ni apertura de SAGVA.
 
+
+## Ordenación interactiva del listado (23-11-2026)
+
+- Cada encabezado de **Código de barras, Artículo, Tipo, Familia, Marca, Precio público, Ganancia estimada, Stock y Estado** tiene flechas para ordenar los registros visibles en sentido ascendente o descendente.
+- Primer clic en **Stock**, **Precio público** o **Ganancia estimada**: de mayor a menor. Segundo clic: de menor a mayor. Primer clic en campos de texto: orden alfabético ascendente; el segundo invierte el orden.
+- La ordenación se aplica a **todos los artículos que cumplen los filtros**, **antes de paginar** (50 por página), sin refrescar la página ni modificar SQLite. Al cambiar el orden se vuelve a la página 1.
+- Códigos de barra se comparan con orden natural; campos de familia, marca o código faltantes se dejan al final en ambas direcciones; empates conservan una secuencia determinista.
+- La columna **Acciones** conserva sus botones fijos: no representa un atributo ordenable.
+- Ganancia estimada solo puede ordenarse si el usuario tiene permiso para verla. Ejecutar `node tools/test-ordenar-articulos.cjs` como prueba de la función pura.
