@@ -6,22 +6,48 @@ import { ArticulosListadoClient } from "./articulos-listado-client";
 export const dynamic = "force-dynamic";
 
 export default async function ArticulosPage() {
-  const [articulos, familias, subfamilias, marcas, user] = await Promise.all([
+  // Evitar relaciones anidadas de miles de artículos en una misma consulta.
+  // Prisma/SQLite puede provocar un RustPanicError con lecturas relacionales
+  // masivas y campos de ordenación que no forman parte de la proyección.
+  const [articulos, familias, subfamilias, marcas, user, precios, stocks] = await Promise.all([
     prisma.articulo.findMany({
       select: {
         id: true, codigoProducto: true, codigoBarra: true, nombre: true,
-        tipoArticulo: true, familiaId: true, subfamiliaId: true, marcaId: true, estado: true,
-        precios: { where: { vigente: true }, orderBy: { createdAt: "desc" }, take: 1,
-          select: { precioPublico: true, precioConIva: true } },
-        stocks: { select: { stockActual: true } }
+        tipoArticulo: true, familiaId: true, subfamiliaId: true, marcaId: true, estado: true
       },
       orderBy: { nombre: "asc" }
     }),
     prisma.familia.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.subfamilia.findMany({ select: { id: true, familiaId: true, nombre: true }, orderBy: { nombre: "asc" } }),
     prisma.marca.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
-    getCurrentUser()
+    getCurrentUser(),
+    prisma.articuloPrecio.findMany({
+      where: { vigente: true },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { id: true, articuloId: true, precioPublico: true, precioConIva: true, createdAt: true }
+    }),
+    prisma.inventarioStock.findMany({
+      select: { articuloId: true, stockActual: true }
+    })
   ]);
+
+  // Seleccionar el último precio vigente sin provocar consultas por artículo.
+  const precioPorArticulo = new Map<string, { precioPublico: number; costoConIva: number }>();
+  for (const precio of precios) {
+    if (!precioPorArticulo.has(precio.articuloId)) {
+      precioPorArticulo.set(precio.articuloId, {
+        precioPublico: Number(precio.precioPublico),
+        costoConIva: Number(precio.precioConIva)
+      });
+    }
+  }
+
+  const stockPorArticulo = new Map<string, number>();
+  for (const stock of stocks) {
+    stockPorArticulo.set(stock.articuloId,
+      (stockPorArticulo.get(stock.articuloId) ?? 0) + Number(stock.stockActual));
+  }
+
   const codigo = user?.rol?.codigo;
   const puedeEditar = codigo === "admin" || codigo === "root" ||
     !!(user?.rolId && await prisma.permiso.findFirst({
@@ -29,16 +55,17 @@ export default async function ArticulosPage() {
         campo: null }, select: { id: true }
     }));
   const mostrarGanancia = codigo === "admin" || codigo === "root" || codigo === "contabilidad";
+
   return (
     <AppShell title="Artículos" subtitle="Catálogo, clasificación y precios">
       <ArticulosListadoClient
         articulos={articulos.map(a => ({
-          id:a.id, codigoProducto:a.codigoProducto, codigoBarra:a.codigoBarra, nombre:a.nombre,
-          tipoArticulo:a.tipoArticulo, familiaId:a.familiaId, subfamiliaId:a.subfamiliaId,
-          marcaId:a.marcaId, estado:a.estado,
-          precioPublico:Number(a.precios[0]?.precioPublico ?? 0),
-          costoConIva:Number(a.precios[0]?.precioConIva ?? 0),
-          stock:a.stocks.reduce((sum,s)=>sum+Number(s.stockActual),0)
+          id: a.id, codigoProducto: a.codigoProducto, codigoBarra: a.codigoBarra, nombre: a.nombre,
+          tipoArticulo: a.tipoArticulo, familiaId: a.familiaId, subfamiliaId: a.subfamiliaId,
+          marcaId: a.marcaId, estado: a.estado,
+          precioPublico: precioPorArticulo.get(a.id)?.precioPublico ?? 0,
+          costoConIva: precioPorArticulo.get(a.id)?.costoConIva ?? 0,
+          stock: stockPorArticulo.get(a.id) ?? 0
         }))}
         familias={familias} subfamilias={subfamilias} marcas={marcas}
         puedeEditar={Boolean(puedeEditar)} mostrarGanancia={mostrarGanancia}
