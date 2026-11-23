@@ -73,10 +73,10 @@ try{
  @{Commit=$target;LockHash=(Hash 'package-lock.json');SchemaHash=(Hash 'prisma/schema.prisma')} | ConvertTo-Json | Set-Content $stamp -Encoding UTF8
  if($resume){
   $script:state.Stage='iniciando';State
-  # Mantener la dirección IPv6 que usaba Next sin tocar servicios IPv4 ajenos.
+  # SAGVA usa exclusivamente IPv4 127.0.0.1:3001; Propinas conserva 127.0.0.1:3000.
   $scriptPath=Join-Path $root 'node_modules/next/dist/bin/next'
-  $p=Start-Process node.exe -ArgumentList @(('"'+$scriptPath+'"'),'dev','--hostname','::','--port','3000') -WorkingDirectory $root -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $local 'servidor.out.log') -RedirectStandardError (Join-Path $local 'servidor.err.log')
-  $ready=$false;for($i=0;$i -lt 45;$i++){Start-Sleep -Seconds 1;try{$r=Invoke-WebRequest 'http://[::1]:3000' -UseBasicParsing -TimeoutSec 3;if($r.StatusCode -eq 200){$ready=$true;break}}catch{}}
+  $p=Start-Process node.exe -ArgumentList @(('"'+$scriptPath+'"'),'dev','--hostname','127.0.0.1','--port','3001') -WorkingDirectory $root -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $local 'servidor.out.log') -RedirectStandardError (Join-Path $local 'servidor.err.log')
+  $ready=$false;for($i=0;$i -lt 45;$i++){Start-Sleep -Seconds 1;try{$r=Invoke-WebRequest 'http://127.0.0.1:3001' -UseBasicParsing -TimeoutSec 3;if($r.StatusCode -eq 200){$ready=$true;break}}catch{}}
   if(!$ready){throw 'El servidor no respondió. Revisar .local/servidor.err.log.'}
  }
  $script:state.Stage='completado';$script:state.Result='correcto';$script:state.RecoveryRequired=$false;State

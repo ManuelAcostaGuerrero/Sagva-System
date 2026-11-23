@@ -72,3 +72,15 @@ La actualización de GitHub **NO importa automáticamente** los productos en SQL
 Los registros de Excel que no pasan validación quedan pendientes para revisión. Se importan **solo** PRODUCTO, ARTICULO y EXENTOS de las familias CIGARROS/TABAQUERIA; se omiten las promociones. Los identificadores son el ID original; las familias se crean si faltan; subfamilia y marca quedan sin asignar. Se mantiene el precio público original de forma literal. El costo es el costo neto y se deriva costo con IVA (19%) y recargo. Valores de costo/venta incoherentes requieren revisión.
 
 **No** copiar el JSON a GitHub, ni activar la importación en el inicio del sistema, ni ejecutarla automáticamente en el actualizador. El tipo tributario `IVA_RETENIDO` identifica una clasificación para futuras operaciones; la emisión tributaria/ticket de venta se debe integrar y verificar por separado.
+
+
+## Puertos dedicados y detener solo SAGVA (22-11-2026)
+
+- Propinas permanece en `127.0.0.1:3000` y nunca debe ser detenido por los scripts SAGVA.
+- SAGVA utiliza exclusivamente `127.0.0.1:3001` en `INICIAR_SAGVA.bat`, `npm run dev`, `npm run dev:local`, `npm start` y el reinicio del actualizador.
+- Para detener SAGVA, ejecutar `DETENER_SAGVA.bat` desde la **carpeta raíz del repositorio** (junto a `package.json`). El `.bat` es autónomo: incluye PowerShell interno, no requiere un `.ps1` adicional.
+- El script verifica `package.json` de SAGVA, adquiere el mismo mutex local del actualizador, busca únicamente procesos `node.exe` con línea de comando que contiene **la ruta absoluta de este repositorio** seguida de `node_modules\\next\\`, revalida PID/fecha de creación y detiene solo esos procesos.
+- No mata procesos por puerto ni utiliza `taskkill /IM node.exe`; Propinas, otros Node, bases SQLite y demás servicios no se modifican.
+- En instalaciones existentes, si `.env` contiene `APP_URL=http://localhost:3000`, actualizar **solo ese valor** a `APP_URL=http://127.0.0.1:3001` después de respaldar `.env`. No sustituir ni borrar `.env`.
+- Acceso: `http://127.0.0.1:3001`. Si la aplicación Next está ocupando el puerto 3001 por otro proceso, no tomar un puerto alternativo automáticamente; revisar primero.
+- No probar una actualización directamente en caja sin validar primero que ambas aplicaciones se inician y detienen de manera independiente.

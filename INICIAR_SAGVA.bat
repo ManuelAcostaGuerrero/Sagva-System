@@ -34,9 +34,9 @@ if not exist "node_modules" (
 )
 
 echo Iniciando Sagva System...
-echo URL local: http://localhost:3000
+echo URL local: http://127.0.0.1:3001
 echo.
-npm run dev
+npm run dev:local
 
 echo.
 echo Sagva System se ha detenido.

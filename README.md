@@ -67,7 +67,7 @@ npm install
 ```bash
 DATABASE_URL="file:./dev.db"
 NEXTAUTH_SECRET="change-this-secret"
-APP_URL="http://localhost:3000"
+APP_URL="http://127.0.0.1:3001"
 ```
 
 3. Generar cliente Prisma:
@@ -103,7 +103,7 @@ npm run dev:local
 La aplicación queda disponible en:
 
 ```text
-http://localhost:3000
+http://127.0.0.1:3001
 ```
 
 Usuario inicial:
