@@ -147,9 +147,8 @@ export function ArticulosListadoClient({
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="grid min-w-0 flex-1 gap-2 md:grid-cols-4">
-          <label className="md:col-span-2">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+          <label className="min-w-0">
             <span className="sagva-label">Buscar por nombre, ID o código de barras</span>
             <div className="relative">
               <Search
@@ -189,6 +188,10 @@ export function ArticulosListadoClient({
               <option value="inactivo">Deshabilitado</option>
             </select>
           </label>
+          <Link href="/articulos/nuevo"
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 self-end whitespace-nowrap sagva-button-primary">
+            <Plus className="h-4 w-4" /> Nuevo artículo
+          </Link>
           <label>
             <span className="sagva-label">Familia</span>
             <select className="sagva-field" value={familia} onChange={e=>cambiarFiltro(setFamilia,e.target.value)}>
@@ -196,10 +199,6 @@ export function ArticulosListadoClient({
               {familias.map(f=><option key={f.id} value={f.id}>{f.nombre}</option>)}
             </select>
           </label>
-        </div>
-        <Link href="/articulos/nuevo" className="ml-auto inline-flex h-10 shrink-0 items-center gap-2 self-end sagva-button-primary">
-          <Plus className="h-4 w-4" /> Nuevo artículo
-        </Link>
       </div>
 
       {mensaje ? <p role="status" className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">{mensaje}</p> : null}
